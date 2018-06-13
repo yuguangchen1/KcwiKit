@@ -20,7 +20,7 @@ for regfn in glob.glob(dir+"/*.reg"):
     #pdb.set_trace()
     
     imgfn=regfn.replace('.reg','_intf.fits')
-    os.system("kcwi_masksky_ds9.py "+imgfn+" "+regfn) 
+    os.system("/scr/yuguangchen/Soft/idl/kcwi/kcwi_masksky_ds9.py "+imgfn+" "+regfn) 
 
 
 

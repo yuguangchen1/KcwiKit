@@ -4,6 +4,11 @@ pro kcwi_preflat,twinum,overwrite=overwrite,dir=dir
 if ~keyword_set(dir) then begin
 	dir='redux/'
 endif
+
+if ~keyword_set(twinum) then begin
+	print,'%KCWI_PREFLAT: Must specify image numbers.'
+	return
+endif
 ;twinum=35
 
 ; read config

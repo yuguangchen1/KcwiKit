@@ -1,7 +1,7 @@
 
 ; quick stack in 3D space
 pro kcwi_quickstack,fnlist,shiftlist,preshiftfn=preshiftfn,$
-	pixscale=pixscale,dimension=dimension,orientaion=orientaion,$
+	pixscale_x=pixscale_x,pixscale_y=pixscale_y,dimension=dimension,orientaion=orientaion,$
 	cubed=cubed
 
 if ~keyword_set(cubed) then begin
@@ -17,16 +17,24 @@ if ~keyword_set(shiftlist) then begin
 	shiftlist=file_dirname(fnlist)+'/'+file_basename(fnlist,'.list')+'.shift.list'
 endif
 
-if ~keyword_set(pixscale) then begin
-	pixscale=par.pixscale
-	if pixscale eq -1 then begin
-		pixscale=0.3
+if ~keyword_set(pixscale_x) then begin
+	pixscale_x=par.stack_xpix
+	if pixscale_x eq -1 then begin
+		pixscale_x=0.3
 	endif 
 endif
-pixscale=pixscale/3600.
+pixscale_x=pixscale_x/3600.
+
+if ~keyword_set(pixscale_y) then begin
+	pixscale_y=par.stack_ypix
+	if pixscale_y eq -1 then begin
+		pixscale_y=0.3
+	endif
+endif
+pixscale_y=pixscale_y/3600.
 
 if ~keyword_set(dimension) then begin
-	dimension=par.dimension
+	dimension=par.stack_dimension
 	if dimension[0] eq -1 then begin
 		dimension=[100,100]
 	endif
@@ -62,18 +70,26 @@ if preshiftfn ne '' then begin
 	prefn=prefn+'_i'+suffix+'.fits'
 endif
 
+
+
 ; construct WCS
-hdr0=headfits(fn[0])
+hdrtmp=headfits(fn[0])
+xyad,hdrtmp,float(sxpar(hdrtmp,'naxis1'))/2.-1,float(sxpar(hdrtmp,'naxis2'))/2.-1,ratmp,dectmp
+center=[ratmp,dectmp]
+
+hdr0=hdrtmp
 sxaddpar,hdr0,'naxis1',dimension[0]
 sxaddpar,hdr0,'naxis2',dimension[1]
-sxaddpar,hdr0,'crpix1',dimension[0]/2.
-sxaddpar,hdr0,'crpix2',dimension[1]/2.
+sxaddpar,hdr0,'crpix1',float(dimension[0])/2.
+sxaddpar,hdr0,'crpix2',float(dimension[1])/2.
+sxaddpar,hdr0,'crval1',center[0]
+sxaddpar,hdr0,'crval2',center[1]
 old_cd11=sxpar(hdr0,'cd1_1')
 old_cd12=sxpar(hdr0,'cd1_2')
 old_cd21=sxpar(hdr0,'cd2_1')
 old_cd22=sxpar(hdr0,'cd2_2')
-sxaddpar,hdr0,'cd1_1',-pixscale
-sxaddpar,hdr0,'cd2_2',pixscale
+sxaddpar,hdr0,'cd1_1',-pixscale_x
+sxaddpar,hdr0,'cd2_2',pixscale_y
 sxaddpar,hdr0,'cd1_2',0
 sxaddpar,hdr0,'cd2_1',0
 sxaddpar,hdr0,'naxis',2
@@ -89,23 +105,23 @@ sxdelpar,hdr0,'naxis3'
 
 ; orientation
 if ~isa(orientation) then begin
-	orientation=par.orientation
+	orientation=par.stack_orientation
 	if orientation eq -1000 then begin
 		orientation=atan(old_cd21/(-old_cd11))*!radeg
 		;orientation=atan(old_cd12/old_cd22)*!radeg
 	endif
 endif
-sxaddpar,hdr0,'cd1_1',-pixscale*cos(orientation/!radeg)
-sxaddpar,hdr0,'cd2_1',pixscale*sin(orientation/!radeg)
-sxaddpar,hdr0,'cd1_2',pixscale*sin(orientation/!radeg)
-sxaddpar,hdr0,'cd2_2',pixscale*cos(orientation/!radeg)
+sxaddpar,hdr0,'cd1_1',-pixscale_x*cos(orientation/!radeg)
+sxaddpar,hdr0,'cd2_1',pixscale_x*sin(orientation/!radeg)
+sxaddpar,hdr0,'cd1_2',pixscale_y*sin(orientation/!radeg)
+sxaddpar,hdr0,'cd2_2',pixscale_y*cos(orientation/!radeg)
 
 
 ; distribute flux
 old_pixscale=fltarr(2)
 old_pixscale[0]=sqrt(old_cd11^2+old_cd21^2)
 old_pixscale[1]=sqrt(old_cd12^2+old_cd22^2)
-fluxscale=pixscale^2/(old_pixscale[0]*old_pixscale[1])
+fluxscale=pixscale_x*pixscale_y/(old_pixscale[0]*old_pixscale[1])
 
 
 print,'Projecting...'
@@ -181,7 +197,7 @@ for i=0,n_elements(fn)-1 do begin
 	
 	; flux
 	data=data*fluxscale
-	vdata=vdata/fluxscale^2
+	vdata=vdata*fluxscale
 	
 
 	; pre-shift
@@ -288,8 +304,8 @@ for ii=0,dimension[0]-1 do begin
 
 				data_3d[ii,jj,kk]=total(data0[ii,jj,kk,*]*weight)/$
 					total(weight)
-				vdata_3d[ii,jj,kk]=total((weight*$
-					vdata0[ii,jj,kk,*])^2)/total(weight)^2
+				vdata_3d[ii,jj,kk]=total(weight^2*$
+					vdata0[ii,jj,kk,*])/total(weight)^2
 				edata_3d[ii,jj,kk]=total(edata0[ii,jj,kk,q])
 				mdata_3d[ii,jj,kk]=0
 
