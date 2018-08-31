@@ -45,7 +45,11 @@ end
 ; ===================================
 ; Update WCS to ground baesd images.
 ; ===================================
-pro kcwi_quickastrom,cubefn,imgfn,wavebin=wavebin
+pro kcwi_quickastrom,cubefn,imgfn,wavebin=wavebin,boxsize=boxsize
+if ~keyword_set(boxsize) then boxsize=11
+boxsize=long(boxsize)
+
+print,file_basename(cubefn)
 
 suffix='_icubes.fits'
 if strmatch(cubefn,'*_icubes.fits') eq 0 then begin
@@ -115,8 +119,9 @@ sxaddpar,hdr2d,'crval2',par.ref_ad[1]
 
 
 ; entry 1: 
-dx=(findgen(11)-5)*2
-dy=(findgen(11)-5)*2
+if boxsize mod 2 eq 0 then boxsize++
+dx=(findgen(boxsize)-(boxsize-1)/2)*2
+dy=(findgen(boxsize)-(boxsize-1)/2)*2
 tmp=kcwi_quickastrom_crl(img,hdr2d,img0,hdr0,dx,dy,crl=crl,bestimg=bestimg)
 xmax=tmp[0]
 ymax=tmp[1]

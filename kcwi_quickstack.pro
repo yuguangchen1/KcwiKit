@@ -135,6 +135,8 @@ for i=0,n_elements(fn)-1 do begin
 
 	data=mrdfits(fn[i],0,hdr,/silent)
 	data=double(data)
+	data=kcwi_vachelio(data,hdr,hdrtmp,vcorr=vcorr)
+	print,'    Vcorr ='+string(vcorr)
 	sz=size(data,/dim)
 	sxdelpar,hdr,'cd3_3'
 	sxdelpar,hdr,'crval3'
@@ -144,6 +146,7 @@ for i=0,n_elements(fn)-1 do begin
 	
 	vdata=mrdfits(vfn[i],0,vhdr,/silent)
 	vdata=double(vdata)
+	vdata=kcwi_vachelio(vdata,vhdr,hdrtmp)
 	sxdelpar,vhdr,'cd3_3'
 	sxdelpar,vhdr,'crval3'
 	sxdelpar,vhdr,'crpix3'
@@ -151,6 +154,7 @@ for i=0,n_elements(fn)-1 do begin
 	sxaddpar,vhdr,'naxis',2
 
 	mdata=mrdfits(mfn[i],0,mhdr,/silent)
+	mdata=kcwi_vachelio(mdata,mhdr,hdrtmp,/mask)
 	sxdelpar,mhdr,'cd3_3'
 	sxdelpar,mhdr,'crval3'
 	sxdelpar,mhdr,'crpix3'
@@ -173,7 +177,7 @@ for i=0,n_elements(fn)-1 do begin
 	rdend=sxpar(hdr,'daterend')
 	rdend=date_conv(rdend,'MODIFIED')
 	if rdend le expend then begin
-		print,'Warning XPOSURE incorrect...'
+		print,'    Warning XPOSURE incorrect...'
 		expbeg=date_conv(sxpar(hdr,'date-beg'),'MODIFIED')
 		expend=rdend-53.64/3600./24.
 		exptime=(expend-expbeg)*3600.*24.
@@ -181,9 +185,9 @@ for i=0,n_elements(fn)-1 do begin
 		;expend=date_conv(expend,'FITS')
 		;sxaddpar,hdr,'date-end',expend
 		sxaddpar,hdr,'xposure',exptime
-		print,'   Setting to'+string(exptime)+'.' 
+		print,'       Setting to'+string(exptime)+'.' 
 	endif
-	print,exptime
+	print,'  Exptime ='+string(exptime)
 	etime[i]=exptime
 	edata=data*0.+exptime
 	q=where(data eq 0 or mdata ne 0)
@@ -216,7 +220,7 @@ for i=0,n_elements(fn)-1 do begin
 	endif
 
 
-	for kk=0,sz[2]-1 do begin
+	for kk=0,old_naxis3-1 do begin
 		hdrshift=hdr
 		vhdrshift=vhdr
 		mhdrshift=mhdr
@@ -277,7 +281,8 @@ for i=0,n_elements(fn)-1 do begin
 		hastrom,var,vhdrshift,newvar,newvhdr,hdr0,missing=0,interp=2,cubic=-0.5
 		vdata0[*,*,kk,i]=newvar
 
-		hastrom,mask,mhdrshift,newmask,newmhdr,hdr0,missing=1,interp=1,cubic=-0.5
+		hastrom,mask,mhdrshift,newmask,newmhdr,hdr0,missing=1,interp=2,cubic=-0.5
+		newmask=ceil(abs(newmask))
 		mdata0[*,*,kk,i]=newmask
 
 		hastrom,expimg,ehdrshift,newexpimg,newehdr,hdr0,missing=0,interp=1,cubic=-0.5
