@@ -21,6 +21,7 @@ from scipy import ndimage
 #from image_registration.fft_tools import shift
 import matplotlib
 import matplotlib.pyplot as plt
+import pyregion
 from fpdf import FPDF
 from tqdm import tqdm
 import pdb
@@ -55,7 +56,10 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
 		"align_ad":np.array([-1.,-1.]),
 		"stack_ad":np.array([-1.,-1.]),
 		"stepsig":0,
-		"drizzle":0.}
+		"drizzle":0.,
+		"med_x":0.,
+		"med_y":0.,
+		"med_z":0.}
 
 	with open(parname,'r') as file:
 		lins=file.readlines()
@@ -285,6 +289,26 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
 		par["drizzle"]=float(ele[1])
 
 
+	# median filtering
+	q=np.where(np.array(keys)=="med_x")[0]
+	if len(q) >0:
+		q=q[0]
+		ele=lins[q].split()
+		par['med_x']=float(ele[1])
+
+	q=np.where(np.array(keys)=='med_y')[0]
+	if len(q) >0:
+		q=q[0]
+		ele=lins[q].split()
+		par['med_y']=float(ele[1])
+	
+	q=np.where(np.array(keys)=='med_x')[0]
+	if len(q) >0:
+		q=q[0]
+		ele=lins[q].split()
+		par['med_z']=float(ele[1])
+
+
 	return par
 
 
@@ -413,7 +437,7 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 
-def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,overwrite=False,keepmont=False):
+def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,overwrite=False,keep_intermediate=False,method='drizzle'):
 #	fnlist="q0100-bx172.list"
 #	shiftlist=""
 #	preshiftfn=""
@@ -430,6 +454,19 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 		suffix="cubed"
 	else:
 		suffix="cubes"
+	
+	if method.lower()!='drizzle':
+		if method.lower()=='nearest-neighbor':
+			method_flag='nei'
+		elif method.lower()=='bilinear':
+			method_flag='lin'
+		elif method.lower()=='biquadratic':
+			method_flag='qua'
+		elif method.lower()=='bicubic':
+			method_flag='cub'
+		else:
+			print('Error: Method not found.')
+			return 0
 
 	parfn=fnlist.replace(".list",".par")
 	par=kcwi_stack_readpar(parfn)
@@ -530,7 +567,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 	hdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
 	if suffix!='cubes':
 		#hdr0['BUNIT']='adu/s'
-		hdr0['BUNIT']='adu/s/arcsec2'
+		hdr0['BUNIT']='count/s/arcsec2'
 
 	# orientation
 	if orientation==-1000:
@@ -610,8 +647,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 			if suffix!='cubes':
 				hdu_i.data=hdu_i.data/exptime/area
 				hdu_v.data=hdu_v.data/exptime**2/area**2
-				hdu_i.header['BUNIT']='adu/s/arcsec2'
-				hdu_v.header['BUNIT']='adu2/s2/arcsec4'
+				hdu_i.header['BUNIT']='count/s/arcsec2'
+				hdu_v.header['BUNIT']='count2/s2/arcsec4'
 			else:
 				hdu_i.data=hdu_i.data/area
 				hdu_v.data=hdu_v.data/area**2
@@ -692,25 +729,72 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 			hdu_e.writeto(trimefn[i],overwrite=True)
 
 		# Montage
-		montfn=trimfn[i].replace('.trim.fits','.mont.fits')
-		montvfn=trimvfn[i].replace('.trim.fits','.mont.fits')
-		montmfn=trimmfn[i].replace('.trim.fits','.mont.fits')
-		montefn=trimefn[i].replace('.trim.fits','.mont.fits')
-		if (not os.path.isfile(montfn)) or overwrite==True:
-			# using shell version for now, see if energy leakage is still a problem
-			exe="mProjectCube -z "+str(drizzle)+" -f "+trimfn[i]+" "+montfn+" "+fnhdr
-			void=os.system(exe)
-			exev="mProjectCube -z "+str(drizzle)+" -f  "+trimvfn[i]+" "+montvfn+" "+fnhdr
-			voidv=os.system(exev)
-			exem="mProjectCube -z "+str(drizzle)+" -f  "+trimmfn[i]+" "+montmfn+" "+fnhdr
-			voidm=os.system(exem)
-			exee="mProjectCube -z "+str(drizzle)+" -f  "+trimefn[i]+" "+montefn+" "+fnhdr
-			voide=os.system(exee)
+		if method.lower()=='drizzle':
+			montfn=trimfn[i].replace('.trim.fits','.mont.fits')
+			montvfn=trimvfn[i].replace('.trim.fits','.mont.fits')
+			montmfn=trimmfn[i].replace('.trim.fits','.mont.fits')
+			montefn=trimefn[i].replace('.trim.fits','.mont.fits')
+		else:
+			montfn=trimfn[i].replace('.trim.fits','.'+method_flag+'.fits')
+			montvfn=trimvfn[i].replace('.trim.fits','.'+method_flag+'.fits')
+			montmfn=trimmfn[i].replace('.trim.fits','.'+method_flag+'.fits')
+			montefn=trimefn[i].replace('.trim.fits','.'+method_flag+'.fits')
 
-			#void=mProjectCube(trimfn[i],montfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
-			#voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
-			#voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
-			#voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+
+		if (not os.path.isfile(montfn)) or overwrite==True:
+		#if True:
+			if method.lower()!='drizzle':
+				newhdr=fits.Header.fromtextfile(fnhdr)
+
+				hdut=(fits.open(trimfn[i]))[0]
+				hdut.data[np.isfinite(hdut.data)==False]=0.
+				newi,newa=reproject_interp(hdut,newhdr,order=method,independent_celestial_slices=True)
+				hdui=fits.PrimaryHDU(newi,newhdr)
+				hdua=fits.PrimaryHDU(newa,newhdr)
+				hdui.writeto(montfn,overwrite=True)
+				hdua.writeto(montfn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
+
+				hdutv=(fits.open(trimvfn[i]))[0]
+				hdutv.data[np.isfinite(hdutv.data)==False]=0.
+				newv,newa=reproject_interp(hdutv,newhdr,order=method,independent_celestial_slices=True)
+				hduv=fits.PrimaryHDU(newv,newhdr)
+				hdua=fits.PrimaryHDU(newa,newhdr)
+				hduv.writeto(montvfn,overwrite=True)
+				hdua.writeto(montvfn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
+
+				hdutm=(fits.open(trimmfn[i]))[0]
+				hdutm.data[np.isfinite(hdutm.data)==False]=0.
+				newm,newa=reproject_interp(hdutm,newhdr,order='bilinear',independent_celestial_slices=True)
+				hdum=fits.PrimaryHDU(newm,newhdr)
+				hdua=fits.PrimaryHDU(newa,newhdr)
+				hdum.writeto(montmfn,overwrite=True)
+				hdua.writeto(montmfn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
+
+				hdute=(fits.open(trimefn[i]))[0]
+				hdute.data[np.isfinite(hdute.data)==False]=0.
+				newe,newa=reproject_interp(hdute,newhdr,order='bilinear',independent_celestial_slices=True)
+				hdue=fits.PrimaryHDU(newe,newhdr)
+				hdua=fits.PrimaryHDU(newa,newhdr)
+				hdue.writeto(montefn,overwrite=True)
+				hdua.writeto(montefn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
+
+			else:
+				# using shell version for now because of memory leakage of MontagePy
+				exe="mProjectCube -z "+str(drizzle)+" -f "+trimfn[i]+" "+montfn+" "+fnhdr
+				void=os.system(exe)
+				exev="mProjectCube -z "+str(drizzle)+" -f  "+trimvfn[i]+" "+montvfn+" "+fnhdr
+				voidv=os.system(exev)
+				exem="mProjectCube -z "+str(drizzle)+" -f  "+trimmfn[i]+" "+montmfn+" "+fnhdr
+				voidm=os.system(exem)
+				exee="mProjectCube -z "+str(drizzle)+" -f  "+trimefn[i]+" "+montefn+" "+fnhdr
+				voide=os.system(exee)
+
+				#void=mProjectCube(trimfn[i],montfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
+				#voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
+				#voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+				#voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+
+
 
 		# cach cubes
 		newcube=fits.open(montfn)[0].data
@@ -734,15 +818,22 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 		#print(newcubem.shape)
 		#print(newcubee.shape)
 
-		if keepmont==False:
+		if keep_intermediate==False:
 			os.remove(montfn)
 			os.remove(montvfn)
 			os.remove(montmfn)
 			os.remove(montefn)
-			os.remove(montfn.replace('mont','mont_area'))
-			os.remove(montvfn.replace('mont','mont_area'))
-			os.remove(montmfn.replace('mont','mont_area'))
-			os.remove(montefn.replace('mont','mont_area'))
+			if method.lower()=='drizzle':
+				os.remove(montfn.replace('mont','mont_area'))
+				os.remove(montvfn.replace('mont','mont_area'))
+				os.remove(montmfn.replace('mont','mont_area'))
+				os.remove(montefn.replace('mont','mont_area'))
+			else:
+				os.remove(montfn.replace('.'+method_flag,'.'+method_flag+'_area'))
+				os.remove(montvfn.replace('.'+method_flag,'.'+method_flag+'_area'))
+				os.remove(montmfn.replace('.'+method_flag,'.'+method_flag+'_area'))
+				os.remove(montefn.replace('.'+method_flag,'.'+method_flag+'_area'))
+
 
 
 	# Stacking!!!
@@ -753,49 +844,45 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 	mdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.int16)+1
 	for ii in tqdm(range(dimension[0])):
 		#print(ii)
-		for jj in range(dimension[1]):
-			for kk in range(hdr0['NAXIS3']):
-				#img=np.array([cube[kk,jj,ii] for cube in data0])
-				#var=np.array([cube[kk,jj,ii] for cube in vdata0])
-				#mask=np.array([cube[kk,jj,ii] for cube in mdata0])
-				#exp=np.array([cube[kk,jj,ii] for cube in edata0])
-				img=data0[:,kk,jj,ii]
-				var=vdata0[:,kk,jj,ii]
-				mask=mdata0[:,kk,jj,ii]
-				exp=edata0[:,kk,jj,ii]
+		#for jj in range(dimension[1]):
+		#	for kk in range(hdr0['NAXIS3']):
+		img=data0[:,:,:,ii]
+		var=vdata0[:,:,:,ii]
+		mask=mdata0[:,:,:,ii]
+		exp=edata0[:,:,:,ii]
 
-				mask[~np.isfinite(img)]=1
-				mask[~np.isfinite(var)]=1
-				mask[var==0]=1
+		mask[~np.isfinite(img)]=1
+		mask[~np.isfinite(var)]=1
+		mask[var==0]=1
 
-				q=(mask==0)
-				if np.sum(q)==0:
-					continue
+		q=(mask==0)
+		if np.sum(q)==0:
+			continue
 				
-				weight=np.zeros(var.shape[0])
-				weight[var!=0]=1/np.abs(var[var!=0])
-				#weight=exp
-				weight[~q]=0
+		weight=np.zeros(var.shape)
+		#weight[var!=0]=1/np.abs(var[var!=0])
+		weight=exp.copy()
+		weight[~q]=np.nan
 
-				weight[~np.isfinite(weight)]=0
+		#weight[~np.isfinite(weight)]=0
 				
-				#q2=stats.sigma_clip(img[q],sigma=5,masked=True)
-				#weight[q][q2.mask]=0
+		#q2=stats.sigma_clip(img[q],sigma=5,masked=True)
+		#weight[q][q2.mask]=0
 
-				data_3d[ii,jj,kk]=np.sum(img*weight)/np.sum(weight)
-				vdata_3d[ii,jj,kk]=np.sum(weight**2*var)/np.sum(weight)**2
-				edata_3d[ii,jj,kk]=np.sum(exp[weight!=0])
-				mdata_3d[ii,jj,kk]=0
+		data_3d[ii,:,:]=np.transpose(np.nansum(img*weight,axis=0)/np.nansum(weight,axis=0))
+		vdata_3d[ii,:,:]=np.transpose(np.nansum(weight**2*var,axis=0)/np.nansum(weight,axis=0)**2)
+		edata_3d[ii,:,:]=np.transpose(np.sum(exp*np.isfinite(weight),axis=0))
+		mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
 
 
 	# write
 	vhdr0=hdr0.copy()
 	if suffix=='cubes':
 		#vhdr0['BUNIT']='10^(-32)erg2/s2/cm4/Angstrom2'
-		vhdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
+		vhdr0['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
 	else:
 		#vhdr0['BUNIT']='adu2/s2'
-		vhdr0['BUNIT']='adu2/s2/arcsec4'
+		vhdr0['BUNIT']='count2/s2/arcsec4'
 
 	mhdr0=hdr0.copy()
 	del mhdr0['BUNIT']
@@ -804,15 +891,21 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 	ehdr0=hdr0.copy()
 	ehdr0['BUNIT']='s'
 
+	if method.lower()!='drizzle':
+		suffix_all=suffix+'_'+method_flag[0]
+	else:
+		suffix_all=suffix
 
+	data_3d=np.nan_to_num(data_3d)
 	hdu_i=fits.PrimaryHDU(data_3d.T,header=hdr0)
-	hdu_i.writeto(fnlist.replace('.list','_i'+suffix+'.fits'),overwrite=True)
+	hdu_i.writeto(fnlist.replace('.list','_i'+suffix_all+'.fits'),overwrite=True)
+	vdata_3d=np.nan_to_num(vdata_3d)
 	hdu_v=fits.PrimaryHDU(vdata_3d.T,header=vhdr0)
-	hdu_v.writeto(fnlist.replace('.list','_v'+suffix+'.fits'),overwrite=True)
+	hdu_v.writeto(fnlist.replace('.list','_v'+suffix_all+'.fits'),overwrite=True)
 	hdu_m=fits.PrimaryHDU(mdata_3d.T,header=mhdr0)
-	hdu_m.writeto(fnlist.replace('.list','_m'+suffix+'.fits'),overwrite=True)
+	hdu_m.writeto(fnlist.replace('.list','_m'+suffix_all+'.fits'),overwrite=True)
 	hdu_e=fits.PrimaryHDU(edata_3d.T,header=ehdr0)
-	hdu_e.writeto(fnlist.replace('.list','_e'+suffix+'.fits'),overwrite=True)
+	hdu_e.writeto(fnlist.replace('.list','_e'+suffix_all+'.fits'),overwrite=True)
 
 	end=ostime.time()
 	#print(end-start)
@@ -1058,11 +1151,10 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 						if np.sum(mult!=0)>0:
 							crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
 				
-				fig=plt.figure(1)
-				plt.clf()
+				fig,ax=plt.subplots(figsize=(4,4))
 				xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5
 				yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5
-				plt.pcolormesh(xplot,yplot,crls.T)
+				ax.pcolormesh(xplot,yplot,crls.T)
 
 				# find closest local maximum
 				max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
@@ -1140,12 +1232,12 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 				#plt.clf()
 				xplot=(np.append(xx,xx[1]-xx[0]+xx[-1])-0.5)/upfactor+xshift[i]
 				yplot=(np.append(yy,yy[1]-yy[0]+yy[-1])-0.5)/upfactor+yshift[i]
-				plt.pcolormesh(xplot,yplot,crls.T,cmap='plasma')
+				ax.pcolormesh(xplot,yplot,crls.T,cmap='plasma')
 
 				tmp=np.unravel_index(crls.argmax(),crls.shape)
 				xshift[i]+=xx[tmp[0]]/upfactor
 				yshift[i]+=yy[tmp[1]]/upfactor
-				plt.plot(xshift[i],yshift[i],'+',color='r')
+				ax.plot(xshift[i],yshift[i],'+',color='r')
 				plt.title(os.path.basename(fn[i]))
 
 
@@ -1173,6 +1265,9 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 				#thumshift=thumshift.T
 				#data_thum[:,:,i]=thum_shift
 
+				plt.show()
+				fig.tight_layout()
+
 				pngfn.append('kcwi_align/'+os.path.basename(fn[i]).replace('.fits','_align.png'))
 				fig.savefig(pngfn[-1])
 				
@@ -1189,7 +1284,9 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 		pdf.output('kcwi_align/'+fnlist.replace('.list','.align.pdf'))
 
 
-	hdu=fits.PrimaryHDU(data0_thum.T)
+	hdr0['NAXIS']=3
+	hdr0['NAXIS3']=len(fn)
+	hdu=fits.PrimaryHDU(data0_thum.T,header=hdr0)
 	hdu.writeto('kcwi_align/'+fnlist.replace('.list','.thum0.fits'),overwrite=True)
 
 	writefn=[i.replace('.fits','') for i in fn]
@@ -1201,15 +1298,47 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 	return
 
 
+def kcwi_medfilter(fnlist,med_x=-1.,med_y=-1.,med_z=-1,regfn=''):
 
-def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0):
-	
 	print(os.path.basename(fnlist))
 
 	suffix='cubes'
 	cubefn=fnlist.replace('.list','_i'+suffix+'.fits')
 	if path.isfile(cubefn)==False:
 		suffix='cubed'
+		cubefn=fnlist.replace('.list','_i'+suffix+'.fits')
+
+	parfn=fnlist.replace('.list','.par')
+	par=kcwi_stack_readpar(parfn)
+
+
+
+
+def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle'):
+	
+	print(os.path.basename(fnlist))
+
+	if method.lower()!='drizzle':
+		if method.lower()=='nearest-neighbor':
+			method_flag='nei'
+		elif method.lower()=='bilinear':
+			method_flag='lin'
+		elif method.lower()=='biquadratic':
+			method_flag='qua'
+		elif method.lower()=='bicubic':
+			method_flag='cub'
+		else:
+			print('Error: Method not found.')
+			return 0
+
+	suffix='cubes'
+	if method.lower()!='drizzle':
+		suffix=suffix+'_'+method_flag[0]
+	cubefn=fnlist.replace('.list','_i'+suffix+'.fits')
+	if path.isfile(cubefn)==False:
+		suffix='cubed'
+		if method.lower()!='drizzle':
+			suffix=suffix+'_'+method_flag[0]
 		cubefn=fnlist.replace('.list','_i'+suffix+'.fits')
 
 	parfn=fnlist.replace('.list','.par')
