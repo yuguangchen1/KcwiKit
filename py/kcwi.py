@@ -12,7 +12,7 @@ from astropy import time
 from astropy import stats
 from astropy import table
 from reproject import reproject_interp
-from MontagePy.main import mProjectCube
+#from MontagePy.main import mProjectCube
 from PyAstronomy import pyasl
 from scipy import interpolate
 from scipy import signal
