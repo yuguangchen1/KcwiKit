@@ -59,7 +59,8 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
 		"drizzle":0.,
 		"med_x":0.,
 		"med_y":0.,
-		"med_z":0.}
+		"med_z":0.,
+		"background_subtraction":False}
 
 	with open(parname,'r') as file:
 		lins=file.readlines()
@@ -307,6 +308,13 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
 		q=q[0]
 		ele=lins[q].split()
 		par['med_z']=float(ele[1])
+
+	# background subtraction
+	q=np.where(np.array(keys)=="background_subtraction")[0]
+	if len(q)>0:
+		q=q[0]
+		ele=lins[q].split()
+		par['background_subtraction']=bool(ele[1])
 
 
 	return par
@@ -915,7 +923,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,dim
 
 
 
-def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.):
+def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False):
 
 	# support for direct putting in FITS
 	if fnlist.endswith('.fits'):
@@ -981,6 +989,11 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 		if upfactor==-1000.:
 			upfactor=10.
 	upfactor=np.ceil(upfactor).astype(int)
+
+	# background subtraction in the alignment cut? 
+	if background_subtraction==False:
+		background_subtraction=par['background_subtraction']
+	background_subtraction=bool(background_subtraction)
 
 	# make tmp directory
 	if not os.path.exists('kcwi_align'):
@@ -1147,6 +1160,11 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 					for jj in range(crls.shape[1]):
 						cut0=img0[box[0]:box[1],box[2]:box[3]]
 						cut=img[box[0]-dx[ii,jj]:box[1]-dx[ii,jj],box[2]-dy[ii,jj]:box[3]-dy[ii,jj]]
+						if background_subtraction:
+							cut=cut-np.median(cut)
+							cut0=cut0-np.median(cut)
+						cut[cut<0]=0
+						cut0[cut0<0]=0
 						mult=cut0*cut
 						if np.sum(mult!=0)>0:
 							crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
@@ -1225,6 +1243,11 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 					for jj in range(crls.shape[1]):
 						cut0=img0[box[0]*upfactor:box[1]*upfactor,box[2]*upfactor:box[3]*upfactor]
 						cut=img[box[0]*upfactor-dx[ii,jj]:box[1]*upfactor-dx[ii,jj],box[2]*upfactor-dy[ii,jj]:box[3]*upfactor-dy[ii,jj]]
+						if background_subtraction:
+							cut0=cut0-np.median(cut0)
+							cut=cut-np.median(cut)
+						cut[cut<0]=0
+						cut0[cut0<0]=0
 						mult=cut*cut0
 						crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
 				
