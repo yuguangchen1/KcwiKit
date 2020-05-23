@@ -12,6 +12,7 @@ from astropy import time
 from astropy import stats
 from astropy import table
 from reproject import reproject_interp
+from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
 from PyAstronomy import pyasl
 from scipy import interpolate
@@ -1000,7 +1001,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
 
 
 
-def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,scale='linear'):
+def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,method='interp'):
 
     # support for direct putting in FITS
     if fnlist.endswith('.fits'):
@@ -1202,7 +1203,10 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 hdr['CRVAL2']=hdr['CRVAL2']+predec[index]/3600.
         
         # initial projection
-        newthum,coverage=reproject_interp((thum.T,hdr),hdr0,order='bilinear')
+        if method=='interp':
+            newthum,coverage=reproject_interp((thum.T,hdr),hdr0,order='bilinear')
+        elif method=='exact':
+            newthum,coverage=reproject_exact((thum.T,hdr),hdr0)
         newthum=newthum.T
         newthum[np.isfinite(newthum)==0]=np.nan
         #hdutmp=fits.PrimaryHDU(newthum)
@@ -1309,7 +1313,10 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 hdr0_up['CD2_1']=hdr0_up['CD2_1']/upfactor
                 hdr0_up['CD1_2']=hdr0_up['CD1_2']/upfactor
                 hdr0_up['CD2_2']=hdr0_up['CD2_2']/upfactor
-                newthum1,coverage=reproject_interp((thum_1.T,hdr_1),hdr0_up,order='bilinear')
+                if method=='interp':
+                    newthum1,coverage=reproject_interp((thum_1.T,hdr_1),hdr0_up,order='bilinear')
+                elif method=='exact':
+                    newthum1,coverage=reproject_exact((thum_1.T,hdr_1),hdr0_up)
                 newthum1=newthum1.T
 
                 # do the shift from last iteration
@@ -1317,7 +1324,10 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 tmp=wcs_hdr0.all_pix2world(hdr0['CRPIX1']+xshift[i],hdr0['CRPIX2']+yshift[i],1)
                 hdr['CRVAL1']=hdr['CRVAL1']+(float(tmp[0])-hdr0['CRVAL1'])
                 hdr['CRVAL2']=hdr['CRVAL2']+(float(tmp[1])-hdr0['CRVAL2'])
-                newthum2,coverage=reproject_interp((thum.T,hdr),hdr0_up,order='bilinear')
+                if method=='interp':
+                    newthum2,coverage=reproject_interp((thum.T,hdr),hdr0_up,order='bilinear')
+                elif method=='exact':
+                    newthum2,coverage=reproject_exact((thum.T,hdr),hdr0_up)
                 newthum2=newthum2.T
 
                 img0=np.nan_to_num(newthum1)
