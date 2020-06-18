@@ -3,6 +3,7 @@ from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import cosmology
+import reproject
 import pyregion
 import os
 import warnings
@@ -337,6 +338,7 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
 
     # masking
     #mask_img=np.zeros(hdu0.shape[1:3],dtype=int)
+    fitsmask=None
     if maskfn!='':
 
         fitsmask_hdu=fits.open(maskfn)[0]
@@ -364,7 +366,11 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
             if yindex[i]+1<fitsmask.shape[1]:
                 fitsmask[xindex[i],yindex[i]+1]=True
     
-    mask_3d=np.repeat([fitsmask],sz[0],axis=0)    
+    if fitsmask is not None:
+        mask_3d=np.repeat([fitsmask],sz[0],axis=0)    
+    else:
+        mask_3d=np.zeros_like(hdu0.data)
+    
     if mcubefn!='':
         hdu_mcube=fits.open(mcubefn)[0]
         mask_3d=np.bitwise_or(mask_3d,hdu_mcube.data)
@@ -568,7 +574,7 @@ def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_re
 
 
 
-def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_range=None,pa_range=[0,360],dr=None,dpa=None,redshift=-1.,drizzle=1.0,c_radec=False,clean=True,compress=False,automask_basename='',exact_area=False):
+def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_range=None,pa_range=[0,360],dr=None,dpa=None,redshift=-1.,drizzle=1.0,c_radec=False,clean=True,compress=False,automask_basename='',exact_area=False,montage=False):
     """
     Resample a cube in cartesian coordinate to cylindrical coordinate (with ellipticity) 
     using drizzling algorithm. 
@@ -642,6 +648,9 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     exact_area: bool, optional
         Get the exact 2D-area map. Default is a 1D collapsed approximate.  
 
+    montage: bool, optional
+        Use Montage? Defalt = True. If set False, use reproject.interp
+
     Returns
     -------
         (hdu5, ahdu5)
@@ -660,6 +669,9 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
         hdu=tmp[0]
     else:
         ofn=''
+
+    if montage==False:
+        exact_area=True
 
 
     # cosmology
@@ -864,7 +876,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     
     # Set up headers
     hdr3_1=hdu2.header.copy()
-    hdr3_1['NAXIS1']=nx3[0]
+    hdr3_1['NAXIS1']=int(nx3[0])
     hdr3_1['NAXIS2']=ny
     hdr3_1['CTYPE1']='RA---CAR'
     hdr3_1['CTYPE2']='DEC--CAR'
@@ -884,67 +896,87 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     hdr3_1.totextfile(hdr3_1fn,overwrite=True)
 
     hdr3_2=hdr3_1.copy()
-    hdr3_2['NAXIS1']=nx3[1]
+    hdr3_2['NAXIS1']=int(nx3[1])
     hdr3_2['CRVAL1']=xr3[0,1]
     hdr3_2fn='kcwi_tools/cart2cyli_hdr3_2.hdr'
     hdr3_2.totextfile(hdr3_2fn,overwrite=True)
 
     hdr3_3=hdr3_1.copy()
-    hdr3_3['NAXIS1']=nx3[2]
+    hdr3_3['NAXIS1']=int(nx3[2])
     hdr3_3['CRVAL1']=xr3[0,2]
     hdr3_3fn='kcwi_tools/cart2cyli_hdr3_3.hdr'
     hdr3_3.totextfile(hdr3_3fn,overwrite=True)
 
 
-    # montage
-    cube3_1fn='kcwi_tools/cart2cyli_cube3_1.fits'
-    cube3_2fn='kcwi_tools/cart2cyli_cube3_2.fits'
-    cube3_3fn='kcwi_tools/cart2cyli_cube3_3.fits'
-    exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_1fn+' '+hdr3_1fn
-    void=os.system(exe)
-    exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_2fn+' '+hdr3_2fn
-    void=os.system(exe)
-    exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_3fn+' '+hdr3_3fn
-    void=os.system(exe)
+    if montage==True:
+            # montage
+            cube3_1fn='kcwi_tools/cart2cyli_cube3_1.fits'
+            cube3_2fn='kcwi_tools/cart2cyli_cube3_2.fits'
+            cube3_3fn='kcwi_tools/cart2cyli_cube3_3.fits'
+            exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_1fn+' '+hdr3_1fn
+            void=os.system(exe)
+            exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_2fn+' '+hdr3_2fn
+            void=os.system(exe)
+            exe='mProjectCube -z '+str(drizzle)+' -f '+cube2fn+' '+cube3_3fn+' '+hdr3_3fn
+            void=os.system(exe)
 
-    # Merge
-    hdu3_1=fits.open(cube3_1fn)[0]
-    hdu3_2=fits.open(cube3_2fn)[0]
-    hdu3_3=fits.open(cube3_3fn)[0]
-    
-    data4=np.zeros((hdu3_1.shape[0],hdu3_1.shape[1],
-        hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30))
-    data4[:,:,0:hdu3_1.shape[2]-10]=hdu3_1.data[:,:,5:hdu3_1.shape[2]-5]
-    data4[:,:,hdu3_1.shape[2]-10:
-            hdu3_1.shape[2]+hdu3_2.shape[2]-20]=hdu3_2.data[:,:,5:hdu3_2.shape[2]-5]
-    data4[:,:,hdu3_1.shape[2]+hdu3_2.shape[2]-20:
-            hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30]=hdu3_3.data[:,:,5:hdu3_3.shape[2]-5]
-    data4[data4==0]=np.nan
-    #hdutmp=fits.PrimaryHDU(data4)
-    #hdutmp.writeto('kcwi_tools/tmp.fits',overwrite=True)
-    
-    # Area
-    area3_1fn=cube3_1fn.replace('.fits','_area.fits')
-    area3_2fn=cube3_2fn.replace('.fits','_area.fits')
-    area3_3fn=cube3_3fn.replace('.fits','_area.fits')
-    ahdu3_1=fits.open(area3_1fn)[0]
-    ahdu3_2=fits.open(area3_2fn)[0]
-    ahdu3_3=fits.open(area3_3fn)[0]
-    area4=np.zeros((hdu3_1.shape[1],
-        hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30))
-    area4[:,0:hdu3_1.shape[2]-10]=ahdu3_1.data[:,5:hdu3_1.shape[2]-5]
-    area4[:,hdu3_1.shape[2]-10:
-            hdu3_1.shape[2]+hdu3_2.shape[2]-20]=ahdu3_2.data[:,5:hdu3_2.shape[2]-5]
-    area4[:,hdu3_1.shape[2]+hdu3_2.shape[2]-20:
-            hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30]=ahdu3_3.data[:,5:hdu3_3.shape[2]-5]
-    if exact_area:
-        area4=np.repeat([area4],data4.shape[0],axis=0)
-        area4[data4==0]=0
-        area4[~np.isfinite(data4)]=0
-    #hdutmp=fits.PrimaryHDU(area4)
-    #hdutmp.writeto('kcwi_tools/tmp.fits',overwrite=True)
+            # Merge
+            hdu3_1=fits.open(cube3_1fn)[0]
+            hdu3_2=fits.open(cube3_2fn)[0]
+            hdu3_3=fits.open(cube3_3fn)[0]
+            
+            data4=np.zeros((hdu3_1.shape[0],hdu3_1.shape[1],
+                hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30))
+            data4[:,:,0:hdu3_1.shape[2]-10]=hdu3_1.data[:,:,5:hdu3_1.shape[2]-5]
+            data4[:,:,hdu3_1.shape[2]-10:
+                    hdu3_1.shape[2]+hdu3_2.shape[2]-20]=hdu3_2.data[:,:,5:hdu3_2.shape[2]-5]
+            data4[:,:,hdu3_1.shape[2]+hdu3_2.shape[2]-20:
+                    hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30]=hdu3_3.data[:,:,5:hdu3_3.shape[2]-5]
+            data4[data4==0]=np.nan
+            #hdutmp=fits.PrimaryHDU(data4)
+            #hdutmp.writeto('kcwi_tools/tmp.fits',overwrite=True)
+            
+            # Area
+            area3_1fn=cube3_1fn.replace('.fits','_area.fits')
+            area3_2fn=cube3_2fn.replace('.fits','_area.fits')
+            area3_3fn=cube3_3fn.replace('.fits','_area.fits')
+            ahdu3_1=fits.open(area3_1fn)[0]
+            ahdu3_2=fits.open(area3_2fn)[0]
+            ahdu3_3=fits.open(area3_3fn)[0]
 
-    
+            area4=np.zeros((hdu3_1.shape[1],
+                hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30))
+            area4[:,0:hdu3_1.shape[2]-10]=ahdu3_1.data[:,5:hdu3_1.shape[2]-5]
+            area4[:,hdu3_1.shape[2]-10:
+                    hdu3_1.shape[2]+hdu3_2.shape[2]-20]=ahdu3_2.data[:,5:hdu3_2.shape[2]-5]
+            area4[:,hdu3_1.shape[2]+hdu3_2.shape[2]-20:
+                    hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30]=ahdu3_3.data[:,5:hdu3_3.shape[2]-5]
+            if exact_area:
+                area4=np.repeat([area4],data4.shape[0],axis=0)
+                area4[data4==0]=0
+                area4[~np.isfinite(data4)]=0
+            #hdutmp=fits.PrimaryHDU(area4)
+            #hdutmp.writeto('kcwi_tools/tmp.fits',overwrite=True)
+    else:
+        cube3_1,area3_1=reproject.reproject_interp(hdu2,hdr3_1)
+        cube3_2,area3_2=reproject.reproject_interp(hdu2,hdr3_2)
+        cube3_3,area3_3=reproject.reproject_interp(hdu2,hdr3_3)
+
+        data4=np.zeros((cube3_1.shape[0],cube3_1.shape[1],
+                cube3_1.shape[2]+cube3_2.shape[2]+cube3_3.shape[2]-30))
+        data4[:,:,0:cube3_1.shape[2]-10]=cube3_1[:,:,5:cube3_1.shape[2]-5]
+        data4[:,:,cube3_1.shape[2]-10:cube3_1.shape[2]+cube3_2.shape[2]-20]=cube3_2[:,:,5:cube3_2.shape[2]-5]
+        data4[:,:,cube3_1.shape[2]+cube3_2.shape[2]-20:cube3_1.shape[2]+cube3_2.shape[2]+cube3_3.shape[2]-30]=cube3_3[:,:,5:cube3_3.shape[2]-5]
+        data4[data4==0]=np.nan
+
+        area4=np.zeros((area3_1.shape[0],area3_1.shape[1],
+                area3_1.shape[2]+area3_2.shape[2]+area3_3.shape[2]-30))
+        area4[:,:,0:area3_1.shape[2]-10]=area3_1[:,:,5:area3_1.shape[2]-5]
+        area4[:,:,area3_1.shape[2]-10:area3_1.shape[2]+area3_2.shape[2]-20]=area3_2[:,:,5:area3_2.shape[2]-5]
+        area4[:,:,area3_1.shape[2]+area3_2.shape[2]-20:area3_1.shape[2]+area3_2.shape[2]+area3_3.shape[2]-30]=area3_3[:,:,5:area3_3.shape[2]-5]
+        area4=np.nan_to_num(area4)
+    area4[~np.isfinite(data4)]=0
+
     # Resample to final grid
     hdr5=hdr3_1.copy()
     hdr5['NAXIS1']=nx0
