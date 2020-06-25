@@ -454,7 +454,7 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
-               dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,
+               dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
@@ -908,8 +908,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
                 
         weight=np.zeros(var.shape)
         #weight[var!=0]=1/np.abs(var[var!=0])
-        weight=exp.copy()
+        if len(weights)==0:
+            weight=exp.copy()
+        else:
+            weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
+                             hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
+
 
         #weight[~np.isfinite(weight)]=0
                 
