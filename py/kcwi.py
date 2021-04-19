@@ -11,6 +11,7 @@ from astropy import units
 from astropy import time
 from astropy import stats
 from astropy import table
+import pyregion
 from reproject import reproject_interp
 from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
@@ -451,11 +452,123 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 
+    
+def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
+    # Calculate the relative flux of overlapping sources.
+    
+    tab = ascii.read(fnlist)
+    fn = tab['col1']
+    
+    if thumfn is None:
+        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')    
+    hdu_thum = fits.open(thumfn)[0]
+    
+    # convert to SB units
+    if cubed==False:
+        for i in range(hdu_thum.shape[0]):
+            hdu_i = fits.open(fn[i]+'_icubes.fits')[0]
+            dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
+            dy=np.sqrt(hdu_i.header['CD1_2']**2+hdu_i.header['CD2_2']**2)*3600.
+            area=dx*dy
+            hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] / area
+    
+    # calculate relative flux
+    sig = np.nanstd(hdu_thum.data, axis=(1,2))
+    med = np.nanmedian(hdu_thum.data, axis=(1,2))
+    
+    frame_all = []
+    flux_rel_all = []
+    flux_rel = np.zeros(hdu_thum.shape[0])
+    for i in range(hdu_thum.shape[0]):
+        index = (hdu_thum.data[i, :, :] >= nsig * sig[i] + med[i])
+        if i==0:
+            index0 = index.copy()
+        
+        tmp0 = hdu_thum.data[0, (index & index0)].flatten()
+        tmp = hdu_thum.data[i, (index & index0)].flatten()
+
+        frame_all = np.append(frame_all, np.repeat(i, len(tmp)))
+        flux_rel_all = np.append(flux_rel_all, tmp/tmp0)
+        
+        if np.sum(index & index0) <= 5:
+            continue
+        flux_rel[i] = np.median(tmp/tmp0)
+    
+    
+    fig, ax = plt.subplots(figsize=(10,6))
+    ax.scatter(frame_all, flux_rel_all, s=10, color='C0', alpha=0.5)
+    ax.plot(np.arange(len(flux_rel)), flux_rel, 'o-', color='C1')
+    ax.set_xlabel('Frame #')
+    ax.set_ylabel('Relative Flux')
+    xlim = ax.get_xlim()
+    ax.plot(xlim, [1,1], '--', color='black')
+    ax.set_yscale('log')
+    ax.set_xlim(xlim)
+    
+    return
 
 
-def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
+def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
+    # Generate correction factor.
+    
+    tab = ascii.read(fnlist)
+    fn = tab['col1']
+    
+    if thumfn is None:
+        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')    
+    hdu_thum = fits.open(thumfn)[0]
+    
+    # convert to SB units
+    for i in range(hdu_thum.shape[0]):
+        hdu_i = fits.open(fn[i]+'_icubes.fits')[0]
+        dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
+        dy=np.sqrt(hdu_i.header['CD1_2']**2+hdu_i.header['CD2_2']**2)*3600.
+        area=dx*dy
+        hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] / area
+        
+    
+    sig = np.nanstd(hdu_thum.data, axis=(1,2))
+    med = np.nanmedian(hdu_thum.data, axis=(1,2))
+
+    # relative flux
+    flux_rel = np.zeros(hdu_thum.shape[0]) + np.nan
+    flag = np.zeros(hdu_thum.shape[0])
+    for i in range(hdu_thum.shape[0]):
+        
+        if i in frame: 
+            flag[i] = 1
+        
+        index = (hdu_thum.data[i, :, :] >= nsig * sig[i] + med[i])
+        if i==0:
+            index0 = index.copy()
+        
+        tmp0 = hdu_thum.data[0, (index & index0)].flatten()
+        tmp = hdu_thum.data[i, (index & index0)].flatten()
+        
+        if np.sum(index & index0) <= 5:
+            continue
+        flux_rel[i] = np.median(tmp/tmp0)
+    
+    flux_mean = np.nanmean(flux_rel[flag == 0])
+        
+    # Correction factor
+    flux_corr = np.zeros(hdu_thum.shape[0])+1
+    for i in frame: 
+        flux_corr[i] = flux_mean / flux_rel[i]
+
+    
+    fluxtable=table.Table([np.array(fn), flux_corr])
+    ascii.write(fluxtable, fnlist.replace('.list','.flx.list'),overwrite=True,format='no_header')
+    
+    return fluxtable
+
+    
+    
+
+def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
-               overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False):
+               overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
+               use_regmask=True):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -560,8 +673,15 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
     else:
         astrom_rashift=0.
         astrom_decshift=0.
-
-
+        
+    # flux weight
+    if fluxfn=='':
+        fluxfn = fnlist.replace('.list', '.flx.list')
+    if os.path.isfile(fluxfn):
+        tmp = ascii.read(fluxfn)
+        fluxnorm = tmp['col2']
+    else:
+        fluxnorm = np.ones(len(fn))
 
 
     # construct wcs
@@ -647,7 +767,28 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
             hdulist=fits.open(mfn[i])
             hdu_m,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0,mask=True)
             hdulist.close()
+            
+            # region masks
+            regfn = fn[i].replace('.fits','.thum.reg')
+            if os.path.isfile(regfn) and use_regmask==True:
+                hdr2d=hdu_i.header.copy()
+                del hdr2d['CD3_3']
+                del hdr2d['CRVAL3']
+                del hdr2d['CRPIX3']
+                del hdr2d['NAXIS3']
+                del hdr2d['CTYPE3']
+                del hdr2d['CNAME3']
+                del hdr2d['CUNIT3']
+                hdr2d['NAXIS']=2
 
+                region = pyregion.open(regfn).as_imagecoord(hdr2d)
+                tmp = np.mean(hdu_i.data,axis=0)
+                mask_reg = region.get_mask(hdu=fits.PrimaryHDU(tmp,header=hdr2d))
+
+                hdu_i.data[:,mask_reg] = np.nan
+                hdu_v.data[:,mask_reg] = np.Inf
+                hdu_m.data[:,mask_reg] = 128
+                
             # Infinity check
             q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
             hdu_i.data[q]=np.nan
@@ -761,6 +902,10 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
                 hdu_v.data[kk,:,:]=var
                 hdu_m.data[kk,:,:]=mask
                 hdu_e.data[kk,:,:]=expimg
+                
+            # flux correction
+            hdu_i.data = hdu_i.data * fluxnorm[i]
+            hdu_v.data = hdu_v.data * fluxnorm[i]**2
 
 
             # write
@@ -837,7 +982,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
 
 
 
-        # cach cubes
+        # cache cubes
         newcube=fits.open(montfn)[0].data
         newcube[~np.isfinite(newcube)]=0.
         newcubev=fits.open(montvfn)[0].data
@@ -908,8 +1053,10 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
                 
         weight=np.zeros(var.shape)
         #weight[var!=0]=1/np.abs(var[var!=0])
+        fluxweight = 1 / np.repeat(np.repeat(np.array(fluxnorm**2)[:,np.newaxis],
+                             hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2)
         if len(weights)==0:
-            weight=exp.copy()
+            weight = exp.copy() * fluxweight
         else:
             weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
@@ -923,7 +1070,10 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
 
         data_3d[ii,:,:]=np.transpose(np.nansum(img*weight,axis=0)/np.nansum(weight,axis=0))
         vdata_3d[ii,:,:]=np.transpose(np.nansum(weight**2*var,axis=0)/np.nansum(weight,axis=0)**2)
-        edata_3d[ii,:,:]=np.transpose(np.sum(exp*np.isfinite(weight),axis=0))
+        if len(weights)==0:
+            edata_3d[ii,:,:] = np.transpose(np.sum(exp * fluxweight * np.isfinite(weight),axis=0))
+        else:
+            edata_3d[ii,:,:] = np.transpose(np.sum(exp * weight * np.isfinite(weight), axis=0))
         mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
 
 
@@ -1006,7 +1156,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',pixscale_x=0.,pixscale_y=0.,
 
 
 
-def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,method='interp'):
+def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,method='interp',
+              use_regmask=True):
 
     # support for direct putting in FITS
     if fnlist.endswith('.fits'):
@@ -1162,6 +1313,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
         
+        # Intensity cube
         hdu=fits.open(fn[i])[0]
         img=hdu.data.T.copy()
         sz=img.shape
@@ -1180,6 +1332,14 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         del hdr['CUNIT3']
 
         hdr['NAXIS']=2
+        
+        # mask?
+        regfn = fn[i].replace('.fits','.thum.reg')
+        if os.path.isfile(regfn) and use_regmask==True:
+            region = pyregion.open(regfn).as_imagecoord(hdr)
+            tmp = np.mean(img,axis=2)
+            mask_reg = region.get_mask(hdu=fits.PrimaryHDU(tmp.T,header=hdr))
+            img[mask_reg.T!=0]=np.nan
 
         thum=np.zeros((sz[0],sz[1]))
         for ii in range(sz[0]):
@@ -1725,6 +1885,64 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     return
 
 
+def kcwi_package_fn(fnlist):
+    # Get the names of the relevant files to be released. 
+    
+    basename = fnlist.replace('.list', '')
+    
+    default_fns = [basename + '_icubes_wcs.fits',
+                   basename + '_vcubes.fits',
+                   basename + '_mcubes.fits',
+                   basename + '_ecubes.fits',
+                   basename + '.list',
+                   basename + '.par',
+                   basename + '.pre.list',
+                   basename + '.preshift.list',
+                   basename + '.flx.list',
+                   basename + '.shift.list',
+                   basename + '.ipynb',
+                   'kcwi_align/' + basename + '.align.pdf',
+                   'kcwi_astrom/' + basename + '_icubes.astrom.pdf']
+    
+    final_fns = []
+    for fn in default_fns:
+        if os.path.isfile(fn):
+            final_fns.append(fn)
+            
+    return final_fns
+
+
+def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secrets.json'):
+    # automatically upload to google
+    
+    from pydrive.auth import GoogleAuth
+    from pydrive.drive import GoogleDrive
+
+    # Authentication
+    gauth = GoogleAuth()
+    gauth.DEFAULT_SETTINGS['client_config_file'] = jsonfn
+    gauth.LocalWebserverAuth() # Creates local webserver and auto handles authentication.
+
+    drive = GoogleDrive(gauth)
+    
+    for fn in allfiles:
+        # check existing
+        existing_f = drive.ListFile({'q': "'{0:s}' in parents and trashed=false".format(googledirid)}).GetList()
+
+        existing_flag = 0 
+        for f in existing_f:
+            if f['title'] == os.path.basename(fn):
+                existing_flag = 1
+                break
+        if existing_flag == 0:
+            f = drive.CreateFile({"parents": [{"kind": "drive#fileLink", "id": googledirid}]})
+
+        f.SetContentFile(fn)
+        f['title'] = os.path.basename(fn)
+        f.Upload()
+        print('title: %s, id: %s' % (f['title'], f['id']))
+    
+    return
 
 
 
