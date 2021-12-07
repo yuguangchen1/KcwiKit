@@ -568,7 +568,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True):
+               use_regmask=True, low_mem=False):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -738,14 +738,10 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     trimvfn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in vfn]
     trimmfn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in mfn]
     trimefn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in efn]
-    data0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
-    vdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
-    mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
-    edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
-    #data0=[]
-    #vdata0=[]
-    #mdata0=[]
-    #edata0=[]
+    montfns=[]
+    montvfns=[]
+    montmfns=[]
+    montefns=[]
     etime=np.zeros(len(fn))
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
@@ -925,6 +921,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             montvfn=trimvfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montmfn=trimmfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montefn=trimefn[i].replace('.trim.fits','.'+method_flag+'.fits')
+            
+        montfns.append(montfn)
+        montvfns.append(montvfn)
+        montmfns.append(montmfn)
+        montefns.append(montefn)
 
 
         if (not os.path.isfile(montfn)) or overwrite==True:
@@ -979,53 +980,35 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 #voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
                 #voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
                 #voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+                
 
-
-
-        # cache cubes
-        newcube=fits.open(montfn)[0].data
-        newcube[~np.isfinite(newcube)]=0.
-        newcubev=fits.open(montvfn)[0].data
-        newcubev[~np.isfinite(newcubev)]=0.
-        newcubem=np.ceil(fits.open(montmfn)[0].data)
-        newcubem[~np.isfinite(newcubem)]=128
-        newcubee=fits.open(montefn)[0].data
-        newcubee[~np.isfinite(newcubee)]=0.
-        data0[i,:,:,:]=newcube
-        vdata0[i,:,:,:]=newcubev
-        mdata0[i,:,:,:]=newcubem
-        edata0[i,:,:,:]=newcubee
-        #data0.append(newcube)
-        #vdata0.append(newcubev)
-        #mdata0.append(newcubem)
-        #edata0.append(newcubee)
-        #print(newcube.shape)
-        #print(newcubev.shape)
-        #print(newcubem.shape)
-        #print(newcubee.shape)
-
-        if keep_mont==False:
-            os.remove(montfn)
-            os.remove(montvfn)
-            os.remove(montmfn)
-            os.remove(montefn)
-            if method.lower()=='drizzle':
-                os.remove(montfn.replace('mont','mont_area'))
-                os.remove(montvfn.replace('mont','mont_area'))
-                os.remove(montmfn.replace('mont','mont_area'))
-                os.remove(montefn.replace('mont','mont_area'))
-            else:
-                os.remove(montfn.replace('.'+method_flag,'.'+method_flag+'_area'))
-                os.remove(montvfn.replace('.'+method_flag,'.'+method_flag+'_area'))
-                os.remove(montmfn.replace('.'+method_flag,'.'+method_flag+'_area'))
-                os.remove(montefn.replace('.'+method_flag,'.'+method_flag+'_area'))
-        
-        if keep_trim==False:
-            os.remove(trimfn[i])
-            os.remove(trimvfn[i])
-            os.remove(trimmfn[i])
-            os.remove(trimefn[i])
-
+    if low_mem==False:
+        # cache all cubes
+        data0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
+        vdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
+        mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
+        edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
+        for i in range(len(fn)):    
+            newcube=fits.open(montfns[i])[0].data
+            newcube[~np.isfinite(newcube)]=0.
+            newcubev=fits.open(montvfns[i])[0].data
+            newcubev[~np.isfinite(newcubev)]=0.
+            newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+            newcubem[~np.isfinite(newcubem)]=128
+            newcubee=fits.open(montefns[i])[0].data
+            newcubee[~np.isfinite(newcubee)]=0.
+            data0[i,:,:,:]=newcube
+            vdata0[i,:,:,:]=newcubev
+            mdata0[i,:,:,:]=newcubem
+            edata0[i,:,:,:]=newcubee
+            #data0.append(newcube)
+            #vdata0.append(newcubev)
+            #mdata0.append(newcubem)
+            #edata0.append(newcubee)
+            #print(newcube.shape)
+            #print(newcubev.shape)
+            #print(newcubem.shape)
+            #print(newcubee.shape)
 
 
     # Stacking!!!
@@ -1035,13 +1018,32 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     edata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
     mdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.int16)+1
     for ii in tqdm(range(dimension[0])):
-        #print(ii)
-        #for jj in range(dimension[1]):
-        #   for kk in range(hdr0['NAXIS3']):
-        img=data0[:,:,:,ii]
-        var=vdata0[:,:,:,ii]
-        mask=mdata0[:,:,:,ii]
-        exp=edata0[:,:,:,ii]
+        
+        if low_mem==False:
+            img=data0[:,:,:,ii]
+            var=vdata0[:,:,:,ii]
+            mask=mdata0[:,:,:,ii]
+            exp=edata0[:,:,:,ii]
+        else:
+            #cache columns
+            img = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
+            var = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
+            mask = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
+            exp = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
+            for i in range(len(fn)):
+                newcube=fits.open(montfns[i])[0].data
+                newcube[~np.isfinite(newcube)]=0.
+                newcubev=fits.open(montvfns[i])[0].data
+                newcubev[~np.isfinite(newcubev)]=0.
+                newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+                newcubem[~np.isfinite(newcubem)]=128
+                newcubee=fits.open(montefns[i])[0].data
+                newcubee[~np.isfinite(newcubee)]=0.
+                img[i,:,:]=newcube[:, :, ii]
+                var[i,:,:]=newcubev[:, :, ii]
+                mask[i,:,:]=newcubem[:, :, ii]
+                exp[i,:,:]=newcubee[:, :, ii]
+            
 
         mask[~np.isfinite(img)]=1
         mask[~np.isfinite(var)]=1
@@ -1077,6 +1079,31 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
 
 
+        
+    # remove temp files 
+    for i in range(len(fn)):
+        if keep_mont==False:
+            os.remove(montfns[i])
+            os.remove(montvfns[i])
+            os.remove(montmfns[i])
+            os.remove(montefns[i])
+            if method.lower()=='drizzle':
+                os.remove(montfns[i].replace('mont','mont_area'))
+                os.remove(montvfns[i].replace('mont','mont_area'))
+                os.remove(montmfns[i].replace('mont','mont_area'))
+                os.remove(montefns[i].replace('mont','mont_area'))
+            else:
+                os.remove(montfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
+                os.remove(montvfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
+                os.remove(montmfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
+                os.remove(montefns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
+
+        if keep_trim==False:
+            os.remove(trimfn[i])
+            os.remove(trimvfn[i])
+            os.remove(trimmfn[i])
+            os.remove(trimefn[i])
+        
     # write
     vhdr0=hdr0.copy()
     if suffix=='cubes':
