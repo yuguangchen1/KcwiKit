@@ -1,0 +1,86 @@
+Necessary Files and Locations:
+
+reduce_kcwi2.py ---> ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/scripts/ (or wherever the KCWI python DRP is installed)
+
+kcwi_pipeline{1,2,3,4}.py ---> ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/pipelines/ (kcwi_pipeline.py should already be there)
+
+Stages 1-5:
+!python ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/scripts/reduce_kcwi2.py -f kb*.fits -g -st 1 -c kcwi_mod.cfg --- this makes .intk files
+
+make regions files for sky subtraction kb210415_00065.reg (use intk files because this is where sky subtraction failed and mark regions to exclude i.e. lines/continuum) - save in physical (that's all you have!) [std. stars and science frames]
+	• ds9 kb210705_00042_intk.fits -height 1000 -width 1100 -cmap sls -zscale -regions load kb210705_00042.reg -mode region -zoom to fit -regions shape box &
+		○ maybe -cmap green/cool
+	• ^31^32^:G (for same command, global replace)
+	• for i in {31..53}; do cp kb210705_00030.reg kb210705_000$i.reg; done
+	• Individual: python ~/Software/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py kb210705_00030_intf.fits kb210705_00030.reg
+	• Group: for i in {31..53}; do python ~/Software/KcwiDRP/devel/kcwi_masksky_ds9.py kb210705_000${i}_intf.fits kb210705_000$i.reg; done
+	• mizar: for i in {31..53}; do python /scr/nprusins/Software/KcwiDRP/devel/kcwi_masksky_ds9.py kb210705_000${i}_intf.fits kb210705_000$i.reg; done
+	• for i in {{099..102},{131,132,138}}; …..
+	
+Go back and sky subtract:
+mkdir stage5_nomask
+mv intk files to stage5_nomask
+Python version: [mv *intk.fits *sky.fits stage5_nomask]
+
+remove sky from kcwi.proc (mac specific, else just -i and no '')
+sed -i '' '/sky/d' kcwi.proc
+
+Remove intk
+sed -i '' '/intk/d' kcwi.proc
+
+Alternatively: awk '!/intk|sky/' kcwi.proc > kcwi2.proc and then use -p kcwi2.proc command
+
+
+Make kcwi.sky
+for i in {30..53}; do echo kb210705_000${i}.fits kb210705_000${i}.fits redux/kb210705_000${i}_smsk.fits; done
+
+From Sky Subtraction page:
+	• If you want to specify an external sky frame, only use the first two columns and do not specify a mask file.
+	• If you want to use a mask on the original file, make sure that the first two columns contain the same file name and add the mask file.
+
+
+Stages 5-6
+!python ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/scripts/reduce_kcwi2.py -f kb*.fits -g -st 2 -c kcwi_mod.cfg
+
+2nd set of regions files:
+kcwi_flatten_cube: icube run through flatten cube get icube_2d (/Users/nik/Software/KcwiDRP/kcwi/kcwi_flatten_cube.pro)
+	• arclamp (done automatically), science, - not stds
+	• FOR i=32, 50 DO kcwi_flatten_cube,"kb210705_000"+STRTRIM(i,1)+"_icube.fits"
+boxcar 5pix (e.g.) - find emission lines, draw box around emission (don’t worry about cont), save physical coords
+	• for i in {31..50}; do cp kb210705_00030_icube_2d.reg kb210705_000${i}_icube_2d.reg; done
+	• ds9 kb210705_00050_icube_2d.fits -regions load kb210705_00050_icube_2d.reg -height 1200 -width 2000 -zscale -mode region -smooth function boxcar -smooth radius 3 -smooth yes -regions shape box -zoom to fit &
+thum.fits from kcwi_collapse.pro
+regions around cont objs, save physical coordinates (ellipses e.g.)
+	• std stars and science objects
+	• for i in {35..40}; do cp kb210811_00026_icube.thum.reg kb210811_000${i}_icube.thum.reg; done
+	• ds9 kb210705_00053_icube.thum.fits -regions load kb210705_00053_icube.thum.reg -height 1200 -width 800 -zscale -mode region -regions shape ellipse -zoom to fit &
+
+
+kcwi_makemask_medfilter.py, takes both cont, emission --> _2d.mask and .mask.fits files
+	• python kcwi_makemask_medfilter_nik.py /Volumes/Data/Documents/Dawn/KCWI_Observing/2021aug11_B/redux
+	• python ~/Software/KCWI_post_IDL_DRP/kcwi_makemask_medfilter_nik.py .
+
+kcwi_medfilter_py.pro acts cube by cube --> .med.fits (background model) and new background icube.fits (makes old directory for sake of IDL pipeline) - if it fails check ellipses correspond to .reg file in number (!) and location
+
+kcwi_medfilter_py.pro acts on standard stars and science objects - 'OBJECT' keyword
+automatically reads in medfilter.ppar file
+
+Stages 7-8
+This needs to be run in a terminal window since it requires user input!
+Delete SKY and OBJECT for icube images (e.g. sed -i '' '/OBJECT/d' kcwi.proc (could also use icube but keep ARCLAMP)) and for standard star!
+conda activate kcwidrp
+python ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/scripts/reduce_kcwi2.py -f kb*.fits -g -st 3 -c kcwi_mod.cfg
+
+Stage 8 (med_bl.fits)
+
+ls ../redux/*invsens* | column -c 1 -- this goes into med_bl.list file
+kcwi_combinestd,"fluxcal/med_bl.list" 
+
+Also need to run in the terminal. Delete _ea.fits and replace invsens with med_bl.fits (not med_bl_invsens.fits). mv med_bl_invsens.fits to redux.
+
+sed -i '' '/ea/d' kcwi.proc
+sed -i '' '/icubed/d' kcwi.proc
+for i in {37..39}; do sed -i '' "s/kb210811_000${i}.fits/        med_bl.fits/g" kcwi.proc; done -- 37 - 39 are the std. stars
+
+python ~/anaconda3/envs/kcwidrp/lib/python3.7/site-packages/kcwidrp/scripts/reduce_kcwi2.py -f kb*.fits -g -st 4 -c kcwi_mod.cfg   #-p kcwi_std.proc
+
