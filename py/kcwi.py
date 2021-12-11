@@ -32,7 +32,7 @@ import time as ostime
 
 # Read parameter files for alignment, stacking, and astrometry
 def kcwi_stack_readpar(parname='q0100-bx172.par'):
-    
+
     #parname='q0100-bx172.par'
     par={"align_box":np.array([-1,-1,-1,-1]),
         "align_dimension":np.array([-1,-1]),
@@ -245,7 +245,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         q=q[0]
         ele=lins[q].split()
         par['ref_fn']=ele[1]
-    
+
     q=np.where(np.array(keys)=='ref_search_size')[0]
     if len(q)>0:
         q=q[0]
@@ -263,7 +263,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         q=q[0]
         ele=lins[q].split()
         par['ref_upfactor']=float(ele[1])
-    
+
     q=np.where(np.array(keys)=='ref_box')[0]
     if len(q)>0:
         q=q[0]
@@ -277,7 +277,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         ele=lins[q].split()
         par['ref_nocrl']=float(ele[1])
 
-    
+
     q=np.where(np.array(keys)=="stepsig")[0]
     if len(q) >0:
         q=q[0]
@@ -305,7 +305,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         q=q[0]
         ele=lins[q].split()
         par['med_y']=float(ele[1])
-    
+
     q=np.where(np.array(keys)=='med_x')[0]
     if len(q) >0:
         q=q[0]
@@ -318,7 +318,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         q=q[0]
         ele=lins[q].split()
         par['background_subtraction']=bool(float(ele[1]))
-        
+
     q=np.where(np.array(keys)=="background_level")[0]
     if len(q)>0:
         q=q[0]
@@ -343,7 +343,7 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,method='heliocentric'):
         hdr_new['CRVAL3']=hdr_ref['CRVAL3']
         hdr_new['CRPIX3']=hdr_ref['CRPIX3']
         hdr_new['CD3_3']=hdr_ref['CD3_3']
-        
+
 
     hdr_new['CTYPE3']='WAVE'
 
@@ -351,7 +351,7 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,method='heliocentric'):
     cube_old=hdu.data.copy()
     cube_old=np.nan_to_num(cube_old)
     shape_old=[hdr_old['NAXIS1'],hdr_old['NAXIS2'],hdr_old['NAXIS3']]
-    
+
     wcs_old=wcs.WCS(hdr_old)
     wave_old=wcs_old.wcs_pix2world(np.zeros(shape_old[2]),np.zeros(shape_old[2]),np.arange(shape_old[2]),0)
     wave_old=wave_old[2]*1e10
@@ -363,14 +363,14 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,method='heliocentric'):
 
 
     wave_vac=pyasl.airtovac2(wave_old)
-    
+
     targ=coordinates.SkyCoord(hdr_old['TARGRA'],hdr_old['TARGDEC'],unit='deg',obstime=hdr_old['DATE-BEG'])
     keck=coordinates.EarthLocation.of_site('Keck Observatory')
     vcorr=targ.radial_velocity_correction(kind=method,location=keck)
-    
+
     wave_hel=wave_vac*(1+vcorr.value/2.99792458e8)
 
-    
+
     #resample
     cube_new=np.zeros(shape_new)
     for i in range(shape_new[0]):
@@ -387,14 +387,14 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,method='heliocentric'):
                 spec_pre=f_pre(wave_new)
                 f_nex=interpolate.interp1d(wave_hel,spec,kind='next',bounds_error=False,fill_value=128)
                 spec_nex=f_nex(wave_new)
-                
+
                 spec_new=np.zeros(shape_new[2])
                 for k in range(shape_new[2]):
                     spec_new[k]=max(spec_pre[k],spec_nex[k])
             cube_new[i,j,:]=spec_new
-    
+
     hdu_new=fits.PrimaryHDU(cube_new.T,header=hdr_new)
-    
+
 #   plt.clf()
 #   plt.plot(wave_old,cube_old[:,45,15],drawstyle='steps-mid')
 #   plt.plot(wave_new,cube_new.T[:,45,15],drawstyle='steps-mid')
@@ -412,7 +412,7 @@ def kcwi_checkexptime(dir='./',redux=False):
     else:
         if redux==True:
             dir='./redux/'
-        
+
         print('Checking EXPTIME...')
 
         fn_all=glob.glob(dir+'/kb*.fits')
@@ -432,7 +432,7 @@ def kcwi_checkexptime(dir='./',redux=False):
             rdtime=time.TimeDelta(53.64,format='sec')
             expend=rdend-rdtime
             exptime=expend-expbeg
-            
+
             hdu_all[i].header['XPOSURE']=exptime.sec
             hdu_all[i].header['TELAPSE']=exptime.sec+0.005
 
@@ -452,17 +452,17 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 
-    
+
 def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     # Calculate the relative flux of overlapping sources.
-    
+
     tab = ascii.read(fnlist)
     fn = tab['col1']
-    
+
     if thumfn is None:
-        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')    
+        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')
     hdu_thum = fits.open(thumfn)[0]
-    
+
     # convert to SB units
     if cubed==False:
         for i in range(hdu_thum.shape[0]):
@@ -471,11 +471,11 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
             dy=np.sqrt(hdu_i.header['CD1_2']**2+hdu_i.header['CD2_2']**2)*3600.
             area=dx*dy
             hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] / area
-    
+
     # calculate relative flux
     sig = np.nanstd(hdu_thum.data, axis=(1,2))
     med = np.nanmedian(hdu_thum.data, axis=(1,2))
-    
+
     frame_all = []
     flux_rel_all = []
     flux_rel = np.zeros(hdu_thum.shape[0])
@@ -483,18 +483,18 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
         index = (hdu_thum.data[i, :, :] >= nsig * sig[i] + med[i])
         if i==0:
             index0 = index.copy()
-        
+
         tmp0 = hdu_thum.data[0, (index & index0)].flatten()
         tmp = hdu_thum.data[i, (index & index0)].flatten()
 
         frame_all = np.append(frame_all, np.repeat(i, len(tmp)))
         flux_rel_all = np.append(flux_rel_all, tmp/tmp0)
-        
+
         if np.sum(index & index0) <= 5:
             continue
         flux_rel[i] = np.median(tmp/tmp0)
-    
-    
+
+
     fig, ax = plt.subplots(figsize=(10,6))
     ax.scatter(frame_all, flux_rel_all, s=10, color='C0', alpha=0.5)
     ax.plot(np.arange(len(flux_rel)), flux_rel, 'o-', color='C1')
@@ -504,29 +504,34 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     ax.plot(xlim, [1,1], '--', color='black')
     ax.set_yscale('log')
     ax.set_xlim(xlim)
-    
+
     return
 
 
-def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
+def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
     # Generate correction factor.
-    
+
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
+
     tab = ascii.read(fnlist)
     fn = tab['col1']
-    
+
     if thumfn is None:
-        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')    
+        thumfn = 'kcwi_align/'+fnlist.replace('.list','.thum.fits')
     hdu_thum = fits.open(thumfn)[0]
-    
+
     # convert to SB units
     for i in range(hdu_thum.shape[0]):
-        hdu_i = fits.open(fn[i]+'_icubes.fits')[0]
+        hdu_i = fits.open(fn[i]+'_i'+suffix+'.fits')[0]
         dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
         dy=np.sqrt(hdu_i.header['CD1_2']**2+hdu_i.header['CD2_2']**2)*3600.
         area=dx*dy
         hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] / area
-        
-    
+
+
     sig = np.nanstd(hdu_thum.data, axis=(1,2))
     med = np.nanmedian(hdu_thum.data, axis=(1,2))
 
@@ -534,36 +539,36 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
     flux_rel = np.zeros(hdu_thum.shape[0]) + np.nan
     flag = np.zeros(hdu_thum.shape[0])
     for i in range(hdu_thum.shape[0]):
-        
-        if i in frame: 
+
+        if i in frame:
             flag[i] = 1
-        
+
         index = (hdu_thum.data[i, :, :] >= nsig * sig[i] + med[i])
         if i==0:
             index0 = index.copy()
-        
+
         tmp0 = hdu_thum.data[0, (index & index0)].flatten()
         tmp = hdu_thum.data[i, (index & index0)].flatten()
-        
+
         if np.sum(index & index0) <= 5:
             continue
         flux_rel[i] = np.median(tmp/tmp0)
-    
+
     flux_mean = np.nanmean(flux_rel[flag == 0])
-        
+
     # Correction factor
     flux_corr = np.zeros(hdu_thum.shape[0])+1
-    for i in frame: 
+    for i in frame:
         flux_corr[i] = flux_mean / flux_rel[i]
 
-    
+
     fluxtable=table.Table([np.array(fn), flux_corr])
     ascii.write(fluxtable, fnlist.replace('.list','.flx.list'),overwrite=True,format='no_header')
-    
+
     return fluxtable
 
-    
-    
+
+
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
@@ -585,7 +590,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         suffix="cubed"
     else:
         suffix="cubes"
-    
+
     if method.lower()!='drizzle':
         if method.lower()=='nearest-neighbor':
             method_flag='nei'
@@ -664,7 +669,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         prefn=[i+'_i'+suffix+'.fits' for i in pre_tab['col1']]
         prera=pre_tab['col2']
         predec=pre_tab['col3']
-        
+
     if use_astrom:
         astrom_tab=ascii.read(fnlist.replace('.list','.astrom.list'))
         astrom_rashift=astrom_tab['col1'][0]
@@ -673,7 +678,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     else:
         astrom_rashift=0.
         astrom_decshift=0.
-        
+
     # flux weight
     if fluxfn=='':
         fluxfn = fnlist.replace('.list', '.flx.list')
@@ -693,7 +698,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
     if par['stack_ad'][0]!=-1:
         center=par['stack_ad']
-        
+
     hdr0=hdrtmp.copy()
     hdr0['NAXIS1']=dimension[0]
     hdr0['NAXIS2']=dimension[1]
@@ -752,6 +757,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdulist=fits.open(fn[i])
             hdu_i,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0)
             print('     Vcorr = '+str(vcorr.to('km/s')))
+            hdu_i.header['VCORR'] = (vcorr.to('km/s').value, 'Heliocentric Velocity Correction')
             hdulist.close()
 
             # variance cube -> sigma cube
@@ -763,7 +769,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdulist=fits.open(mfn[i])
             hdu_m,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0,mask=True)
             hdulist.close()
-            
+
             # region masks
             regfn = fn[i].replace('.fits','.thum.reg')
             if os.path.isfile(regfn) and use_regmask==True:
@@ -784,13 +790,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_i.data[:,mask_reg] = np.nan
                 hdu_v.data[:,mask_reg] = np.Inf
                 hdu_m.data[:,mask_reg] = 128
-                
+
             # Infinity check
             q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
             hdu_i.data[q]=np.nan
             hdu_v.data[q]=np.Inf
             hdu_m.data[q]=128
-            
+
 
             # check EXPTIME
             hdu_i=kcwi_checkexptime(hdu_i)
@@ -837,7 +843,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                     hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+prera[index]/3600.
                     hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+predec[index]/3600.
-                                        
+
             # astrometry correction
             if use_astrom:
                 hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift/3600.
@@ -851,7 +857,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift/3600.
                 hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift/3600.
-                                
+
             # shift
             hdu_i.header['CRPIX1']=hdu_i.header['CRPIX1']+xshift[i]
             hdu_i.header['CRPIX2']=hdu_i.header['CRPIX2']+yshift[i]
@@ -898,7 +904,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_v.data[kk,:,:]=var
                 hdu_m.data[kk,:,:]=mask
                 hdu_e.data[kk,:,:]=expimg
-                
+
             # flux correction
             hdu_i.data = hdu_i.data * fluxnorm[i]
             hdu_v.data = hdu_v.data * fluxnorm[i]**2
@@ -921,7 +927,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             montvfn=trimvfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montmfn=trimmfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montefn=trimefn[i].replace('.trim.fits','.'+method_flag+'.fits')
-            
+
         montfns.append(montfn)
         montvfns.append(montvfn)
         montmfns.append(montmfn)
@@ -980,7 +986,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 #voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
                 #voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
                 #voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
-                
+
 
     if low_mem==False:
         # cache all cubes
@@ -988,7 +994,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         vdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
         edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
-        for i in range(len(fn)):    
+        for i in range(len(fn)):
             newcube=fits.open(montfns[i])[0].data
             newcube[~np.isfinite(newcube)]=0.
             newcubev=fits.open(montvfns[i])[0].data
@@ -1018,7 +1024,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     edata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
     mdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.int16)+1
     for ii in tqdm(range(dimension[0])):
-        
+
         if low_mem==False:
             img=data0[:,:,:,ii]
             var=vdata0[:,:,:,ii]
@@ -1043,7 +1049,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 var[i,:,:]=newcubev[:, :, ii]
                 mask[i,:,:]=newcubem[:, :, ii]
                 exp[i,:,:]=newcubee[:, :, ii]
-            
+
 
         mask[~np.isfinite(img)]=1
         mask[~np.isfinite(var)]=1
@@ -1052,7 +1058,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         q=(mask==0)
         if np.sum(q)==0:
             continue
-                
+
         weight=np.zeros(var.shape)
         #weight[var!=0]=1/np.abs(var[var!=0])
         fluxweight = 1 / np.repeat(np.repeat(np.array(fluxnorm**2)[:,np.newaxis],
@@ -1066,7 +1072,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
 
         #weight[~np.isfinite(weight)]=0
-                
+
         #q2=stats.sigma_clip(img[q],sigma=5,masked=True)
         #weight[q][q2.mask]=0
 
@@ -1079,8 +1085,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
 
 
-        
-    # remove temp files 
+
+    # remove temp files
     for i in range(len(fn)):
         if keep_mont==False:
             os.remove(montfns[i])
@@ -1103,7 +1109,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             os.remove(trimvfn[i])
             os.remove(trimmfn[i])
             os.remove(trimefn[i])
-        
+
     # write
     vhdr0=hdr0.copy()
     if suffix=='cubes':
@@ -1130,7 +1136,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     if use_astrom:
         icubefn=fnlist.replace('.list','_i'+suffix_all+'_wcs.fits')
     else:
-        icubefn=fnlist.replace('.list','_i'+suffix_all+'.fits')    
+        icubefn=fnlist.replace('.list','_i'+suffix_all+'.fits')
     hdu_i.writeto(icubefn,overwrite=True)
     vdata_3d=np.nan_to_num(vdata_3d)
     hdu_v=fits.PrimaryHDU(vdata_3d.T,header=vhdr0)
@@ -1139,19 +1145,19 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdu_m.writeto(fnlist.replace('.list','_m'+suffix_all+'.fits'),overwrite=True)
     hdu_e=fits.PrimaryHDU(edata_3d.T,header=ehdr0)
     hdu_e.writeto(fnlist.replace('.list','_e'+suffix_all+'.fits'),overwrite=True)
-    
+
     if use_astrom:
         # wavelength range
         wavebin=par['wavebin']
         if wavebin[0]==-1:
             wavebin=[4000.,5000.]
-        
+
         cube=hdu_i.data.T
         sz=cube.shape
         wcs_cube=wcs.WCS(hdu_i.header)
         wave=wcs_cube.all_pix2world(np.zeros(sz[2]),np.zeros(sz[2]),np.arange(sz[2]),0)
         wave=wave[2]*1e10
-            
+
         # collapsing
         qwave=(wave>wavebin[0]) & (wave<wavebin[1])
 
@@ -1170,16 +1176,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             for jj in range(sz[1]):
                 q=(cube[ii,jj,qwave]!=0) & (np.isfinite(cube[ii,jj,qwave])==1)
                 if np.sum(q)>0:
-                    img[ii,jj]=np.mean(cube[ii,jj,qwave][q])     
-           
+                    img[ii,jj]=np.mean(cube[ii,jj,qwave][q])
+
         hdu_best=fits.PrimaryHDU(img.T,header=hdr_img)
         hdu_best.writeto('kcwi_astrom/'+fnlist.replace('.list','_i'+suffix_all+'.thum.fits'),overwrite=True)
 
     end=ostime.time()
     #print(end-start)
-    
-    return 
-    
+
+    return
+
 
 
 
@@ -1204,7 +1210,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         wavebin=par['wavebin']
         if wavebin[0]==-1:
             wavebin=[4000.,5000.]
-    
+
     # define alignment box
     if box[0]==-1:
         box=par['align_box']
@@ -1229,7 +1235,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         dimension=par['align_dimension']
         if dimension[0]==-1:
             dimension=[100,100]
-    
+
     # size of search steps in x and y directions in pixel units after projection
     if search_size==-1000:
         search_size=par['align_search_size']
@@ -1251,18 +1257,18 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
             upfactor=10.
     upfactor=np.ceil(upfactor).astype(int)
 
-    # background subtraction in the alignment cut? 
+    # background subtraction in the alignment cut?
     if background_subtraction==False:
         background_subtraction=par['background_subtraction']
     background_subtraction=bool(background_subtraction)
-    
+
     if background_level==-1000:
         background_level=par['background_level']
 
     # make tmp directory
     if not os.path.exists('kcwi_align'):
         os.makedirs('kcwi_align')
-    
+
     # read fnlist
     trimtab=ascii.read(fnlist,format="no_header")
     fn=trimtab['col1']
@@ -1294,7 +1300,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
     if par['align_ad'][0]!=-1:
         center=par['align_ad']
-    
+
     hdr0=hdrtmp.copy()
     hdr0['NAXIS1']=dimension[0]
     hdr0['NAXIS2']=dimension[1]
@@ -1339,7 +1345,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     pngfn=[]
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
-        
+
         # Intensity cube
         hdu=fits.open(fn[i])[0]
         img=hdu.data.T.copy()
@@ -1348,7 +1354,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         wave=wcs_i.wcs_pix2world(np.zeros(sz[2]),np.zeros(sz[2]),np.arange(sz[2]),0)
         wave=wave[2]*1e10
         qwave=(wave > wavebin[0]) & (wave < wavebin[1])
-        
+
         hdr=hdu.header.copy()
         del hdr['CD3_3']
         del hdr['CRVAL3']
@@ -1359,7 +1365,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         del hdr['CUNIT3']
 
         hdr['NAXIS']=2
-        
+
         # mask?
         regfn = fn[i].replace('.fits','.thum.reg')
         if os.path.isfile(regfn) and use_regmask==True:
@@ -1393,7 +1399,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 index=index[0]
                 hdr['CRVAL1']=hdr['CRVAL1']+prera[index]/3600.
                 hdr['CRVAL2']=hdr['CRVAL2']+predec[index]/3600.
-        
+
         # initial projection
         if method=='interp':
             newthum,coverage=reproject_interp((thum.T,hdr),hdr0,order='bilinear')
@@ -1456,7 +1462,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                         mult=cut0*cut
                         if np.sum(mult!=0)>0:
                             crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-                
+
                 fig,ax=plt.subplots(figsize=(4,4))
                 xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5
                 yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5
@@ -1475,7 +1481,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                     yindex.append(y_center)
                 xindex=np.array(xindex).astype(int)
                 yindex=np.array(yindex).astype(int)
-                index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) & 
+                index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) &
                         (yindex>=conv_filter) & (yindex<2*crls_size-conv_filter))
                 xindex=xindex[index]
                 yindex=yindex[index]
@@ -1493,8 +1499,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 #tmp=np.unravel_index(crls.argmax(),crls.shape)
                 #xshift[i]=xx[tmp[0]]
                 #yshift[i]=yy[tmp[1]]
-                
-                
+
+
                 # upsample
                 hdr0_up=hdr0.copy()
                 hdr0_up['NAXIS1']=hdr0_up['NAXIS1']*upfactor
@@ -1524,7 +1530,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
                 img0=np.nan_to_num(newthum1)
                 img=np.nan_to_num(newthum2)
-                
+
                 # +/-1 pix
                 ncrl=np.ceil(upfactor).astype(int)
                 xx=np.linspace(-ncrl,ncrl,2*ncrl+1)
@@ -1554,7 +1560,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                         cut0[cut0<0]=0
                         mult=cut0*cut
                         crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-                
+
                 #plt.figure(1)
                 #plt.clf()
                 xplot=(np.append(xx,xx[1]-xx[0]+xx[-1])-0.5)/upfactor+xshift[i]
@@ -1576,7 +1582,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 xshift_xy[i]=tmp[0]-hdr_preshift['CRPIX1']
                 yshift_xy[i]=tmp[1]-hdr_preshift['CRPIX2']
                 print(xshift_xy[i],yshift_xy[i])
-                
+
                 # make shifted thumnail
                 hdr_shift=hdr_preshift.copy()
                 hdr_shift['CRPIX1']=hdr_shift['CRPIX1']+xshift_xy[i]
@@ -1585,7 +1591,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                 thum_shift=thum_shift.T
                 thum_shift[np.isfinite(thum_shift)==0]=np.nan
                 data_thum[:,:,i]=thum_shift
-                
+
                 #hdr_shift=hdr_preshift.copy()
                 #hdr_shift['CRVAL1']=hdr_shift['CRVAL1']+ashift
                 #hdr_shift['CRVAL2']=hdr_shift['CRVAL2']+dshift
@@ -1598,13 +1604,13 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
                 pngfn.append('kcwi_align/'+os.path.basename(fn[i]).replace('.fits','_align.png'))
                 fig.savefig(pngfn[-1])
-                
+
 
 
     if noalign==False:
         hdu=fits.PrimaryHDU(data_thum.T)
         hdu.writeto('kcwi_align/'+fnlist.replace('.list','.thum.fits'),overwrite=True)
-        
+
         pdf=FPDF()
         for i in pngfn:
             pdf.add_page()
@@ -1643,7 +1649,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',save_shift=False):
-    
+
     print(os.path.basename(fnlist))
 
     if method.lower()!='drizzle':
@@ -1685,13 +1691,13 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     if par['ref_ad'][0]==-1:
         print('[ERROR] kcwi_astrometry: Set reference RA-DEC coordinate')
         return
-    
+
     # wavelength range
     if wavebin[0]==-1:
         wavebin=par['wavebin']
         if wavebin[0]==-1:
             wavebin=[4000.,5000.]
-    
+
     # search size
     if search_size==-1000:
         search_size=par['ref_search_size']
@@ -1721,31 +1727,31 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     # nocrl - for QSOs, just put in a number w/o doing cross-correlation
     if nocrl==0:
         nocrl=par['ref_nocrl']
-        
-    
+
+
     # make tmp directory
     if not os.path.exists('kcwi_astrom'):
         os.makedirs('kcwi_astrom')
-    
+
 
     if display==False:
         oldbackend=matplotlib.get_backend()
         matplotlib.use('Agg')
 
-    
+
     hdu_cube=fits.open(cubefn)[0]
     cube=hdu_cube.data.T
     sz=cube.shape
     wcs_cube=wcs.WCS(hdu_cube.header)
     wave=wcs_cube.all_pix2world(np.zeros(sz[2]),np.zeros(sz[2]),np.arange(sz[2]),0)
     wave=wave[2]*1e10
-    
+
     # initial position
     # record old solution
     oref_ra,oref_dec,_=wcs_cube.all_pix2world(par['ref_xy'][0],par['ref_xy'][1],1,1)
     dref_ra=par['ref_ad'][0]-oref_ra
     dref_dec=par['ref_ad'][1]-oref_dec
-    
+
     hdu_cube.header['CRPIX1']=par['ref_xy'][0]
     hdu_cube.header['CRPIX2']=par['ref_xy'][1]
     hdu_cube.header['CRVAL1']=par['ref_ad'][0]
@@ -1772,12 +1778,12 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             if np.sum(q)>0:
                 img[ii,jj]=np.mean(cube[ii,jj,qwave][q])
 
-    
+
     hdu_img0=fits.open(imgfn)[0]
     img0=hdu_img0.data.T
     hdr0=hdu_img0.header
 
-    
+
     if nocrl==0:
 
         hdr_shift=hdr_img.copy()
@@ -1794,24 +1800,24 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             for jj in range(crls.shape[1]):
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
-    
+
                 img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
-    
+
                 if box[0]==-1:
                     mult=img0_shift*img
                 else:
                     mult=img0_shift[box[0]:box[1],box[2]:box[3]]*img[box[0]:box[1],box[2]:box[3]]
                 if np.sum(mult!=0)>0:
                     crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-    
+
         fig=plt.figure(1)
         plt.clf()
         xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5
         yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5
         plt.pcolormesh(xplot,yplot,crls.T)
-    
+
         max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
         maxima=(crls==max_conv)
         labeled, num_objects=ndimage.label(maxima)
@@ -1824,7 +1830,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             yindex.append(y_center)
         xindex=np.array(xindex).astype(int)
         yindex=np.array(yindex).astype(int)
-        index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) & 
+        index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) &
             (yindex>=conv_filter) & (yindex<2*crls_size-conv_filter))
         xindex=xindex[index]
         yindex=yindex[index]
@@ -1837,7 +1843,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         index=r.argmin()
         xmax=xx[xindex[index]]
         ymax=yy[yindex[index]]
-    
+
         # upscale
         print('Iter: 2/2')
         ncrl=np.ceil(upfactor).astype(int)
@@ -1849,18 +1855,18 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             for jj in range(crls.shape[1]):
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
-    
+
                 img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
-    
+
                 if box[0]==-1:
                     mult=img0_shift*img
                 else:
                     mult=img0_shift[box[0]:box[1],box[2]:box[3]]*img[box[0]:box[1],box[2]:box[3]]
                 if np.sum(mult!=0)>0:
                     crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-    
+
         xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5*(xx[1]-xx[0])
         yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5*(xx[1]-xx[0])
         plt.pcolormesh(xplot,yplot,crls.T,cmap='plasma')
@@ -1878,25 +1884,25 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         #img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
         #hdu_test=fits.PrimaryHDU(img0_shift,header=hdr_shift)
         #hdu_test.writeto('test.fits',overwrite=True)
-    
-    
+
+
         # write plot
         fig.savefig('kcwi_astrom/'+cubefn.replace('.fits','.astrom.pdf'))
     else:
         xmax=0
         ymax=0
-        
+
     # best fit
     hdr_best=hdr_img.copy()
     hdr_best['CRPIX1']=hdr_img['CRPIX1']+xmax
     hdr_best['CRPIX2']=hdr_img['CRPIX2']+ymax
     hdu_best=fits.PrimaryHDU(img.T,header=hdr_best)
     hdu_best.writeto('kcwi_astrom/'+cubefn.replace('.fits','.thum.fits'),overwrite=True)
-    
+
     hdu_cube.header['CRPIX1']+=xmax
     hdu_cube.header['CRPIX2']+=ymax
     hdu_cube.writeto(cubefn.replace('.fits','_wcs.fits'),overwrite=True)
-    
+
     if save_shift:
         wcs_best=wcs.WCS(hdr_best)
         ra,dec=wcs_best.all_pix2world([hdr_best['CRPIX1'],hdr_best['CRPIX1']+xmax],
@@ -1905,7 +1911,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         decshift=(dref_dec+dec[0]-dec[1])*3600
         shifttab=table.Table([[rashift],[decshift]])
         ascii.write(shifttab,fnlist.replace('.list','.astrom.list'),overwrite=True,format='no_header')
-    
+
 
     if display==False:
         matplotlib.use(oldbackend)
@@ -1913,10 +1919,10 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
 
 def kcwi_package_fn(fnlist):
-    # Get the names of the relevant files to be released. 
-    
+    # Get the names of the relevant files to be released.
+
     basename = fnlist.replace('.list', '')
-    
+
     default_fns = [basename + '_icubes_wcs.fits',
                    basename + '_vcubes.fits',
                    basename + '_mcubes.fits',
@@ -1930,18 +1936,18 @@ def kcwi_package_fn(fnlist):
                    basename + '.ipynb',
                    'kcwi_align/' + basename + '.align.pdf',
                    'kcwi_astrom/' + basename + '_icubes.astrom.pdf']
-    
+
     final_fns = []
     for fn in default_fns:
         if os.path.isfile(fn):
             final_fns.append(fn)
-            
+
     return final_fns
 
 
 def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secrets.json'):
     # automatically upload to google
-    
+
     from pydrive.auth import GoogleAuth
     from pydrive.drive import GoogleDrive
 
@@ -1951,12 +1957,12 @@ def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secre
     gauth.LocalWebserverAuth() # Creates local webserver and auto handles authentication.
 
     drive = GoogleDrive(gauth)
-    
+
     for fn in allfiles:
         # check existing
         existing_f = drive.ListFile({'q': "'{0:s}' in parents and trashed=false".format(googledirid)}).GetList()
 
-        existing_flag = 0 
+        existing_flag = 0
         for f in existing_f:
             if f['title'] == os.path.basename(fn):
                 existing_flag = 1
@@ -1968,8 +1974,5 @@ def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secre
         f['title'] = os.path.basename(fn)
         f.Upload()
         print('title: %s, id: %s' % (f['title'], f['id']))
-    
+
     return
-
-
-

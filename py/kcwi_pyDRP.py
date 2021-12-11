@@ -329,8 +329,25 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     return par
 
 
+def kcwi_wave_zeropoint(fnlist, correct_wave = 3226.5, cubed=False):
+    tab = ascii.read(fnlist)
+    fn = tab['col1']
+
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
+    for i in range(len(fn)):
+        hdu = fits.open(fn[i]+'_i'+suffix+'.fits')
+        hdr = hdu[0].header
+        print(f"CRVAL3 (old, new): {hdr['CRVAL3']}, {correct_wave}")
+        hdr.set('CRVAL3', correct_wave)
+        hdu.writeto(fn[i]+'_i'+suffix+'.fits', overwrite=True)
+        hdu.close()
+
+
 # Perform air-to-vac, and barycentric correction in wavelength
-def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric', skip_wave=False):
+def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
 
 
     if hdr_ref=='':
@@ -373,9 +390,16 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric', 
     wave_new=wcs_new.wcs_pix2world(np.zeros(shape_new[2]),np.zeros(shape_new[2]),np.arange(shape_new[2]),0)
     wave_new=wave_new[2]*1e10
 
-    if skip_wave == True:
+    if 'VCORR' in hdr_new:
+        if mask==False and uncert==False:
+            print('Skipping Wavelength Correction') # python version of DRP already performs correction
         hdu_new=fits.PrimaryHDU(cube_old,header=hdr_new)
-        return hdu_new
+        vcorr = hdr_new['VCORR']
+        return (hdu_new,vcorr)
+
+    # if skip_wave == True:
+    #     hdu_new=fits.PrimaryHDU(cube_old,header=hdr_new)
+    #     return hdu_new
 
     # print(wave_old)
 
@@ -384,6 +408,8 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric', 
     targ=coordinates.SkyCoord(hdr_old['TARGRA'],hdr_old['TARGDEC'],unit='deg',obstime=hdr_old['DATE-BEG'])
     keck=coordinates.EarthLocation.of_site('Keck Observatory')
     vcorr=targ.radial_velocity_correction(kind=method,location=keck)
+
+    hdr_new['VCORR'] = (vcorr, 'Heliocentric Velocity Correction')
 
     wave_hel=wave_vac*(1+vcorr.value/2.99792458e8)
 
@@ -417,7 +443,7 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric', 
 #   plt.plot(wave_new,cube_new.T[:,45,15],drawstyle='steps-mid')
 #   plt.xlim(3300,3500)
 #   plt.ylim(-0.01,0.01)
-    return (hdu_new,vcorr)
+    return (hdu_new,vcorr.to('km/s').value)
 
 
 
@@ -525,8 +551,13 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     return
 
 
-def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
+def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
     # Generate correction factor.
+
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
 
     tab = ascii.read(fnlist)
     fn = tab['col1']
@@ -537,7 +568,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
 
     # convert to SB units
     for i in range(hdu_thum.shape[0]):
-        hdu_i = fits.open(fn[i]+'_icubes.fits')[0]
+        hdu_i = fits.open(fn[i]+'_i'+suffix+'.fits')[0]
         dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
         dy=np.sqrt(hdu_i.header['CD1_2']**2+hdu_i.header['CD2_2']**2)*3600.
         area=dx*dy
@@ -585,7 +616,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, wave_corr=True):
+               use_regmask=True, low_mem=False):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -765,39 +796,40 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
         # check availability
         if (not os.path.isfile(trimfn[i])) or overwrite==True:
-            if wave_corr == False:
-                print('skip_wave == True')
+            # if wave_corr == False:
+            #     print('Skipping Heliocentric Wavelength Correction')
+            #     # science cube
+            #     hdulist=fits.open(fn[i])
+            #     hdu_i=kcwi_vachelio(hdulist,hdr_ref=hdr0, skip_wave=True)
+            #     hdulist.close()
+            #
+            #     # variance cube -> sigma cube
+            #     hdulist=fits.open(fn[i]) #fits.open(vfn[i])
+            #     hdu_v=kcwi_vachelio(hdulist,hdr_ref=hdr0, uncert=True, skip_wave=True)
+            #     hdulist.close()
+            #
+            #     # mask cube
+            #     hdulist=fits.open(fn[i]) #fits.open(mfn[i])
+            #     hdu_m=kcwi_vachelio(hdulist,hdr_ref=hdr0,mask=True, skip_wave=True)
+            #     hdulist.close()
+            # else:
+                # print('skip_wave == False')
                 # science cube
-                hdulist=fits.open(fn[i])
-                hdu_i=kcwi_vachelio(hdulist,hdr_ref=hdr0, skip_wave=True)
-                hdulist.close()
+            hdulist=fits.open(fn[i])
+            hdu_i,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0)
+            print('     Vcorr = '+ str(vcorr)+ ' km/s')
+            # hdu_i.header['VCORR'] = (vcorr, 'Heliocentric Velocity Correction')
+            hdulist.close()
 
-                # variance cube -> sigma cube
-                hdulist=fits.open(fn[i]) #fits.open(vfn[i])
-                hdu_v=kcwi_vachelio(hdulist,hdr_ref=hdr0, uncert=True, skip_wave=True)
-                hdulist.close()
+            # variance cube -> sigma cube
+            hdulist=fits.open(fn[i]) #fits.open(vfn[i])
+            hdu_v,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0, uncert=True)
+            hdulist.close()
 
-                # mask cube
-                hdulist=fits.open(fn[i]) #fits.open(mfn[i])
-                hdu_m=kcwi_vachelio(hdulist,hdr_ref=hdr0,mask=True, skip_wave=True)
-                hdulist.close()
-            else:
-                print('skip_wave == False')
-                # science cube
-                hdulist=fits.open(fn[i])
-                hdu_i,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0)
-                print('     Vcorr = '+str(vcorr.to('km/s')))
-                hdulist.close()
-
-                # variance cube -> sigma cube
-                hdulist=fits.open(fn[i]) #fits.open(vfn[i])
-                hdu_v,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0, uncert=True)
-                hdulist.close()
-
-                # mask cube
-                hdulist=fits.open(fn[i]) #fits.open(mfn[i])
-                hdu_m,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0,mask=True)
-                hdulist.close()
+            # mask cube
+            hdulist=fits.open(fn[i]) #fits.open(mfn[i])
+            hdu_m,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0,mask=True)
+            hdulist.close()
 
             # region masks
             regfn = fn[i].replace('.fits','.thum.reg')
