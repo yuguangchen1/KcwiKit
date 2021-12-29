@@ -32,6 +32,16 @@ import time as ostime
 
 # Read parameter files for alignment, stacking, and astrometry
 def kcwi_stack_readpar(parname='q0100-bx172.par'):
+    """
+    Parsing parameter files. 
+
+    Args: 
+        parname (string): file name of the parameter file.
+
+    Returns:
+        dict: loaded parameters. 
+    
+    """
 
     #parname='q0100-bx172.par'
     par={"align_box":np.array([-1,-1,-1,-1]),
@@ -330,9 +340,26 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
 
 
 # Perform air-to-vac, and barycentric correction in wavelength
-def kcwi_vachelio(hdu,hdr_ref='',mask=False,method='heliocentric'):
+def kcwi_vachelio(hdu,hdr_ref=None,mask=False,method='heliocentric'):
+    """
+    Convert air wavelength axis to vacuum wavelength axis. Correct heliocentric
+        velocity.
 
-    if hdr_ref=='':
+    Args: 
+        hdu (astropy.io.fits.PrimaryHDU): HDU of the input data cube. 
+        hdr_ref (astropy.io.fits.Header): reference header if different to 
+            the original header.
+        mask (bool): set if 'hdu' is a mask cube.
+        method (bool): 'heliocentric' or 'barycentric'
+
+    Returns:
+        astropy.io.fits.Primary: new HDU with vacuum, and heliocentric-corrected
+            wavelength axis. 
+        float: heliocentric velocity.
+
+    """
+
+    if hdr_ref is None:
         hdr_new=hdu.header.copy()
     else:
         hdr_new=hdu.header.copy()
@@ -454,7 +481,21 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
-    # Calculate the relative flux of overlapping sources.
+    """    
+    Check the relative flux difference of overlapping sources in a list of FITS files
+        for better flux calibration. 
+
+    Args: 
+        fnlist (str): file name of a list file in which the individual FITS file names
+            are stored in 'col1'.
+        thumfn (array of str): set if thum files are stored in different directories. 
+        nsig (float): number of sigmas in sigma-clipping. 
+        cubed (bool): cubed files?
+
+    Returns:
+        None
+
+    """
 
     tab = ascii.read(fnlist)
     fn = tab['col1']
@@ -509,7 +550,22 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
 
 
 def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
-    # Generate correction factor.
+    """
+    Generate a table of flux correction factor. 
+
+    Args: 
+        fnlist (str): file name of the list that contains individual FITS files. 
+        frame (list-like): list of frame numbers that need to be corrected.
+        thumfn (list): list of thum files if stored in non-default locations. 
+        nsig (float): number of sigmas for sigma-clip.
+        cubed (bool): using cubed files?
+
+    Returns:
+        astropy.ascii.table.Table: table containing the normalizing factor to be
+            applied. This table is also written as '*.flx.list'.
+
+
+    """
 
     if cubed:
         suffix="cubed"
@@ -571,19 +627,48 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
-               dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
+               dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False):
-#   fnlist="q0100-bx172.list"
-#   shiftlist=""
-#   preshiftfn=""
-#   pixscale_x=0
-#   pixscale_y=0
-#   dimension=[0,0]
-#   orientation=-1000.
-#   cubed=False
-#   stepsig=0
-#   overwrite=False
+    """
+    Stacking the individual data cubes. 
+
+    Args:
+        fnlist (str): file name of the list that contains individual files. 
+        shiftlist (str): set if the location of the shift file is non-default. 
+        preshiftfn (str): set if there is a preshift file. 
+        fluxfn (str): set if the normalizing file is non-default. 
+        pixscale_x (float): override the parfile pixel size in the x-direction 
+            in arcsec. 
+        pixscale_y (float): override the parfile pixel size in the y-direction 
+            in arcsec. 
+        dimension ([float, float]): numbers of pixels in x- and y-directions. 
+            (Set to override the par file.)
+        orientation (float): position angle of the up direction in degrees. 
+            (Set to override the par file.)
+        cubed (bool): using cubed? 
+        drizzle (float): drizzle factor.
+        weights (list-like): weights of the individual cubes if using non-default.
+        overwrite (bool): overwrite the cached files that was generated in 
+            previous runs?
+        keep_trim (bool): cache the trimmed data cubes? 
+        keep_mont (bool): cache the resampled data cubes? 
+        method (str): 'drizzle' (default), 'nearest-neighbor', 'bilinear', 
+            'biquadratic', or 'bicubic'.
+        use_astrom (bool): set to use the list generated by 'kcwi_astrometry' to
+            correct to absolute astometry. 
+        use_regmask (bool): set if certain pixels in individual files need to be
+            masked by Region files. 
+        low_mem (bool): turn on low-memory mode. Siginificantly reduce memory
+            usage but increase computational time. Useful when working with the
+            small slicer. 
+
+    Returns:
+        None
+        (Stacked cube with be generated as FITS files.)
+
+    """
+
 
 
     if cubed:
@@ -627,9 +712,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         dimension=par["stack_dimension"]
         if dimension[0]==-1:
             dimension=[100,100]
-
-    if stepsig==0:
-        stepsig=par["stepsig"]
 
     if drizzle==0:
         drizzle=par["drizzle"]
@@ -1189,8 +1271,56 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
 
 
-def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,method='interp',
-              use_regmask=True):
+def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,
+    orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,
+    noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,
+    background_subtraction=False,background_level=-1000.,method='interp',
+    use_regmask=True):
+
+    """
+    Align individual data cubes and correct their relative astrometry using 
+        cross-correlation. 
+
+    Args:
+        fnlist (str): file name of the list that contains individual files. 
+        wavebin ([float, float]): wavelength range for white-light image. Set to
+            override par file. 
+        box ([float x 4]): location of the alignment box ([x-lower-left, 
+            y-lower-left, x-upper-right, y-upper-right]). Override the par file.
+        pixscale_x (float): override the parfile pixel size in the x-direction 
+            in arcsec. 
+        pixscale_y (float): override the parfile pixel size in the y-direction 
+            in arcsec. 
+        dimension ([float, float]): numbers of pixels in x- and y-directions. 
+            (Set to override the par file.)
+        orientation (float): position angle of the up direction in degrees. 
+            (Set to override the par file.)
+        preshiftfn (str): set if there is a preshift file. 
+        trim ([float, float]): number of pixels to be trimmed ([lower, upper]). 
+            Override the list file. 
+        cubed (bool): using cubed? 
+        noalign(bool): only generate the thum files without actually conducting
+            the alignment. 
+        display (bool): generate diagnositc plots? 
+        search_size (float): size of the search box. Override the par file. 
+        conv_filter (float): size of the convolution filter when looking for the
+            local maximum. Override the par file. 
+        upfactor (float): oversampling factor for the second pass. Override the 
+            par file. 
+        background_subtraction (bool): set for background subtraction before
+            the cross correlation. 
+        background_level (float): set to use a different background level other
+            than the medium. 
+        method (str): 'interp' (bilinear interpolation) or 'exact' (drizzling). 
+        use_regmask (bool): set if certain pixels in individual files need to be
+            masked by Region files. 
+
+
+    Returns:
+        None
+        (A table of relative pixel shifts are generated as '*.shift.list'.)
+
+    """
 
     # support for direct putting in FITS
     if fnlist.endswith('.fits'):
@@ -1648,7 +1778,34 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 
 
-def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',save_shift=False):
+def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
+    conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
+    save_shift=False):
+
+    """
+    Conduct astrometry correction of the stacked cube by cross-correlating the 
+        cube with existing imaging data. 
+    
+    Args:
+        fnlist (str): file name of the list that contains individual files. 
+        imgfn (str): location of the imaging data to be aligned to. 
+        wavebin ([float, float]): wavelength range for white-light image. Set to
+            override par file. 
+        display (bool): generate diagnositc plots? 
+        search_size (float): size of the search box. Override the par file. 
+        conv_filter (float): size of the convolution filter when looking for the
+            local maximum. Override the par file.
+        upfactor (float): oversampling factor for the second pass. Override the 
+            par file. 
+        box ([float x 4]): location of the alignment box ([x-lower-left, 
+            y-lower-left, x-upper-right, y-upper-right]). Override the par file.
+
+    Returns: 
+        None
+        (Astrometry-corrected data cubes are generated as '*_wcs.fits')
+ 
+
+    """
 
     print(os.path.basename(fnlist))
 
