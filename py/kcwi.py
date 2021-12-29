@@ -29,6 +29,12 @@ from tqdm import tqdm
 import pdb
 import time as ostime
 
+# MontagePy
+try:
+    from MontagePy.main import *
+except:
+    print('MontagePy not installed, using command-line version.')
+
 
 # Read parameter files for alignment, stacking, and astrometry
 def kcwi_stack_readpar(parname='q0100-bx172.par'):
@@ -629,7 +635,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False):
+               use_regmask=True, low_mem=False, montagepy=False):
     """
     Stacking the individual data cubes. 
 
@@ -662,6 +668,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         low_mem (bool): turn on low-memory mode. Siginificantly reduce memory
             usage but increase computational time. Useful when working with the
             small slicer. 
+        montagepy (bool): use MontagePy for drizzling? Otherwise, use the command
+            line Montage installation. Both require proper installation. 
 
     Returns:
         None
@@ -1054,20 +1062,23 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdua.writeto(montefn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
 
             else:
-                # using shell version for now because of memory leakage of MontagePy
-                exe="mProjectCube -z "+str(drizzle)+" -f "+trimfn[i]+" "+montfn+" "+fnhdr
-                void=os.system(exe)
-                exev="mProjectCube -z "+str(drizzle)+" -f  "+trimvfn[i]+" "+montvfn+" "+fnhdr
-                voidv=os.system(exev)
-                exem="mProjectCube -z "+str(drizzle)+" -f  "+trimmfn[i]+" "+montmfn+" "+fnhdr
-                voidm=os.system(exem)
-                exee="mProjectCube -z "+str(drizzle)+" -f  "+trimefn[i]+" "+montefn+" "+fnhdr
-                voide=os.system(exee)
+                if not montagepy:
+                    # Command line version
+                    exe="mProjectCube -z "+str(drizzle)+" -f "+trimfn[i]+" "+montfn+" "+fnhdr
+                    void=os.system(exe)
+                    exev="mProjectCube -z "+str(drizzle)+" -f  "+trimvfn[i]+" "+montvfn+" "+fnhdr
+                    voidv=os.system(exev)
+                    exem="mProjectCube -z "+str(drizzle)+" -f  "+trimmfn[i]+" "+montmfn+" "+fnhdr
+                    voidm=os.system(exem)
+                    exee="mProjectCube -z "+str(drizzle)+" -f  "+trimefn[i]+" "+montefn+" "+fnhdr
+                    voide=os.system(exee)
 
-                #void=mProjectCube(trimfn[i],montfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
-                #voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
-                #voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
-                #voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+                else:
+                    # MontagePy
+                    void=mProjectCube(trimfn[i],montfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+                    voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+                    voidm=mProjectCube(trimmfn[i],montmfn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
+                    voide=mProjectCube(trimefn[i],montefn,fnhdr,drizzle=drizzle,energyMode=False,fullRegion=True)
 
 
     if low_mem==False:
