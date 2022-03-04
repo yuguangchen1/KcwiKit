@@ -368,10 +368,11 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
     hdr_old=hdu[0].header.copy()
     # print(hdr_old)
     if mask==True:
-        hdu = hdu['MASK']
+        hdu = hdu['FLAGS'] # MASK extension isn't very useful yet!
         # print('mask=True')
     elif uncert==True:
         hdu = hdu['UNCERT']
+        hdu.data **= 2 #python DRP generate sigma cube rather than variance cube
         # print('uncert=True')
     else:
         # print('science frame')
@@ -409,7 +410,7 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
     keck=coordinates.EarthLocation.of_site('Keck Observatory')
     vcorr=targ.radial_velocity_correction(kind=method,location=keck)
 
-    hdr_new['VCORR'] = (vcorr, 'Heliocentric Velocity Correction')
+    hdr_new['VCORR'] = (vcorr.to('km/s').value, 'Heliocentric Velocity Correction')
 
     wave_hel=wave_vac*(1+vcorr.value/2.99792458e8)
 
@@ -616,7 +617,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False):
+               use_regmask=True, low_mem=False, n_pix_trim = 4):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -940,6 +941,15 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 mask=hdu_m.data[kk,:,:]
                 expimg=hdu_e.data[kk,:,:]
 
+
+                mask_dim = mask.shape
+                # set edge pixels = 128
+                n_pix = n_pix_trim # nominally 4 pix, really only need 1
+                mask[0:n_pix,:] = 128
+                mask[:,0:n_pix] = 128
+                mask[mask_dim[0]-n_pix:mask_dim[0],:] = 128
+                mask[:,mask_dim[1]-n_pix:mask_dim[1]] = 128
+
                 index_y,index_x=np.where(mask==0)
                 if len(index_y)==0:
                     continue
@@ -951,15 +961,23 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 img[yrange[1]-trim[1,i]+1:,:]=np.nan
                 img[:yrange[0]+trim[0,i],:]=np.nan
+                img[:,xrange[1]:]=np.nan # need to deal with vertical stripes along side
+                img[:,:xrange[0]]=np.nan # in pyDRP since img is nonzero there (~1e-6)
 
                 var[yrange[1]-trim[1,i]+1:,:]=np.Inf
                 var[:yrange[0]+trim[0,i],:]=np.Inf
+                var[:,xrange[1]:]=np.Inf
+                var[:,:xrange[0]]=np.Inf
 
                 mask[yrange[1]-trim[1,i]+1:,:]=128
                 mask[:yrange[0]+trim[0,i],:]=128
+                mask[:,xrange[1]:]=128
+                mask[:,:xrange[0]]=128
 
                 expimg[yrange[1]-trim[1,i]+1:,:]=0
                 expimg[:yrange[0]+trim[0,i],:]=0
+                expimg[:,xrange[1]:]=0
+                expimg[:,:xrange[0]]=0
 
                 hdu_i.data[kk,:,:]=img
                 hdu_v.data[kk,:,:]=var
@@ -1251,7 +1269,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
 
 def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscale_y=-1.,orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,background_subtraction=False,background_level=-1000.,method='interp',
-              use_regmask=True):
+              use_regmask=True, n_pix_trim = 4):
 
     # support for direct putting in FITS
     if fnlist.endswith('.fits'):
@@ -1409,6 +1427,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
         # Intensity cube
         hdu=fits.open(fn[i])[0]
+
         img=hdu.data.T.copy()
         sz=img.shape
         wcs_i=wcs.WCS(hdu.header)
@@ -1443,7 +1462,22 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                     thum[ii,jj]=np.mean(img[ii,jj,qwave][q])
 
         # trim
-        index_x,index_y=np.where(thum!=0)
+
+        # need a mask for pyDRP
+        mask=fits.open(fn[i])['FLAGS']
+
+        mask_dim = mask.shape
+        # set edge pixels = 128
+        n_pix = n_pix_trim # nominally 4 pix, really only need 1
+        mask.data[:,0:n_pix,:] = 128
+        mask.data[:,:,0:n_pix] = 128
+        mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
+        mask.data[:,:,mask_dim[2]-n_pix:mask_dim[2]] = 128
+
+        twod_mask = np.nanmedian(mask.data[qwave,:,:], axis = 0).T # don't really need [qwave,:,:]
+        # thum[twod_mask!=0] = np.nan
+
+        index_x,index_y=np.where(twod_mask==0)
         xrange=[index_x.min(),index_x.max()]
         yrange=[index_y.min(),index_y.max()]
         thum[:,yrange[1]-trim[1,i]+1:]=np.nan
