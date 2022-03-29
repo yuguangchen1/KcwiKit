@@ -866,7 +866,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             print('     EXPTIME = '+str(exptime))
             etime[i]=exptime
             edata=hdu_i.data*0.+exptime
-            q=(hdu_m.data != 0) # related to line 982, removed so that we don't get stripes along the side of the mask
+            # q=(hdu_m.data != 0) # related to line 982, removed so that we don't get stripes along the side of the mask
             # edata[q]=np.nan
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
@@ -984,9 +984,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 # see https://github.com/Keck-DataReductionPipelines/KCWI_DRP/issues/98 "Flag and mask handling not (yet) consistent"
                 cond = (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] > 0) & (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] < 128)
                 mask[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 0
-                expimg[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 1
-
-
+                expimg[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 1 # unity so that weighting isn't affected
 
                 hdu_i.data[kk,:,:]=img
                 hdu_v.data[kk,:,:]=var
@@ -1139,15 +1137,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 exp[i,:,:]=newcubee[:, :, ii]
 
 
-        # index_y,index_x=np.where(mask==0)
-        # if len(index_y)==0:
-        #     continue
-        # xrange=[index_x.min(),index_x.max()]
-        # yrange=[index_y.min(),index_y.max()]
-        # cond = (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] > 0) & (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] < 128)
-        # mask[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 0
-
-
         mask[~np.isfinite(img)]=1
         mask[~np.isfinite(var)]=1
         mask[var==0]=1
@@ -1167,7 +1156,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
 
-        exp[exp==1] = 0
+        exp[exp==1] = 0 #these were bad pixels so set exposure time to zero
 
         #weight[~np.isfinite(weight)]=0
 
@@ -1181,7 +1170,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         else:
             edata_3d[ii,:,:] = np.transpose(np.sum(exp * weight * np.isfinite(weight), axis=0))
         mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
-        # mdata_3d[ii,:,:] = np.transpose(np.nansum(mask*maskwht, axis=0))
 
 
     # remove temp files
