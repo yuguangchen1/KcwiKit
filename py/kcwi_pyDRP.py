@@ -866,8 +866,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             print('     EXPTIME = '+str(exptime))
             etime[i]=exptime
             edata=hdu_i.data*0.+exptime
-            q=(hdu_m.data != 0)
-            edata[q]=0
+            # q=(hdu_m.data != 0) # related to line 982, removed so that we don't get stripes along the side of the mask
+            # edata[q]=0
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
 
@@ -978,6 +978,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 expimg[:yrange[0]+trim[0,i],:]=0
                 expimg[:,xrange[1]:]=0
                 expimg[:,:xrange[0]]=0
+
+                # for this fix to work, also need to correct expimg so mask = expimg (see line 869-870)
+                # quick 'n dirty fix for python DRP - TO DO: perhaps convert flag back to binary so we can choose exactly what pixels to keep/mask
+                # see https://github.com/Keck-DataReductionPipelines/KCWI_DRP/issues/98 "Flag and mask handling not (yet) consistent"
+                cond = (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] > 0) & (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] < 128)
+                mask[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 0
 
                 hdu_i.data[kk,:,:]=img
                 hdu_v.data[kk,:,:]=var
