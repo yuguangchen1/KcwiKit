@@ -347,7 +347,7 @@ def kcwi_wave_zeropoint(fnlist, correct_wave = 3226.5, cubed=False):
 
 
 # Perform air-to-vac, and barycentric correction in wavelength
-def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
+def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,flags=False,method='heliocentric'):
 
 
     if hdr_ref=='':
@@ -368,12 +368,14 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
     hdr_old=hdu[0].header.copy()
     # print(hdr_old)
     if mask==True:
-        hdu = hdu['FLAGS'] # MASK extension isn't very useful yet!
+        hdu = hdu['MASK'] # MASK extension isn't very useful yet!
         # print('mask=True')
     elif uncert==True:
         hdu = hdu['UNCERT']
         hdu.data **= 2 #python DRP generate sigma cube rather than variance cube
         # print('uncert=True')
+    elif flags == True:
+        hdu = hdu['FLAGS']
     else:
         # print('science frame')
         hdu = hdu[0]
@@ -392,8 +394,8 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,method='heliocentric'):
     wave_new=wave_new[2]*1e10
 
     if 'VCORR' in hdr_new:
-        if mask==False and uncert==False:
-            print('Skipping Wavelength Correction') # python version of DRP already performs correction
+        if mask==False and uncert==False and flags==False:
+            print('Wavelength correction already complete') # python version of DRP already performs correction
         hdu_new=fits.PrimaryHDU(cube_old,header=hdr_new)
         vcorr = hdr_new['VCORR']
         return (hdu_new,vcorr)
@@ -616,7 +618,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
-               overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
+               overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, n_pix_trim = 4):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
@@ -699,6 +701,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     vfn=[i+'_v'+suffix+'.fits' for i in fn]
     mfn=[i+'_m'+suffix+'.fits' for i in fn]
     efn=[i+'_e'+suffix+'.fits' for i in fn]
+    # ffn=[i+'_f'+suffix+'.fits' for i in fn]
     fn=[i+'_i'+suffix+'.fits' for i in fn]
 
 
@@ -787,10 +790,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     trimvfn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in vfn]
     trimmfn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in mfn]
     trimefn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in efn]
+    # trimffn=['kcwi_stack/'+os.path.basename(i).replace('.fits','.trim.fits') for i in ffn]
     montfns=[]
     montvfns=[]
     montmfns=[]
     montefns=[]
+    # montffns=[]
     etime=np.zeros(len(fn))
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
@@ -832,6 +837,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdu_m,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0,mask=True)
             hdulist.close()
 
+            # flags cube
+            hdulist=fits.open(fn[i]) #fits.open(mfn[i])
+            hdu_f,vcorr=kcwi_vachelio(hdulist,hdr_ref=hdr0,flags=True)
+            hdulist.close()
+
             # region masks
             regfn = fn[i].replace('.fits','.thum.reg')
             if os.path.isfile(regfn) and use_regmask==True:
@@ -866,8 +876,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             print('     EXPTIME = '+str(exptime))
             etime[i]=exptime
             edata=hdu_i.data*0.+exptime
-            # q=(hdu_m.data != 0) # related to line 982, removed so that we don't get stripes along the side of the mask
-            # edata[q]=np.nan
+            q=(hdu_m.data != 0)
+            edata[q]=0
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
 
@@ -906,6 +916,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+prera[index]/3600.
                     hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+predec[index]/3600.
 
+                    # hdu_f.header['CRVAL1']=hdu_f.header['CRVAL1']+prera[index]/3600.
+                    # hdu_f.header['CRVAL2']=hdu_f.header['CRVAL2']+predec[index]/3600.
+
             # astrometry correction
             if use_astrom:
                 hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift/3600.
@@ -920,6 +933,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift/3600.
                 hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift/3600.
 
+                # hdu_f.header['CRVAL1']=hdu_f.header['CRVAL1']+astrom_rashift/3600.
+                # hdu_f.header['CRVAL2']=hdu_f.header['CRVAL2']+astrom_decshift/3600.
+
             # shift
             hdu_i.header['CRPIX1']=hdu_i.header['CRPIX1']+xshift[i]
             hdu_i.header['CRPIX2']=hdu_i.header['CRPIX2']+yshift[i]
@@ -933,6 +949,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdu_e.header['CRPIX1']=hdu_e.header['CRPIX1']+xshift[i]
             hdu_e.header['CRPIX2']=hdu_e.header['CRPIX2']+yshift[i]
 
+            # hdu_f.header['CRPIX1']=hdu_f.header['CRPIX1']+xshift[i]
+            # hdu_f.header['CRPIX2']=hdu_f.header['CRPIX2']+yshift[i]
+
 
             # trim
             for kk in range(hdr0['NAXIS3']):
@@ -940,17 +959,18 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 var=hdu_v.data[kk,:,:]
                 mask=hdu_m.data[kk,:,:]
                 expimg=hdu_e.data[kk,:,:]
+                flagimg=hdu_f.data[kk,:,:]
 
 
-                mask_dim = mask.shape
+                flag_dim = mask.shape
                 # set edge pixels = 128
                 n_pix = n_pix_trim # nominally 4 pix, really only need 1
-                mask[0:n_pix,:] = 128
-                mask[:,0:n_pix] = 128
-                mask[mask_dim[0]-n_pix:mask_dim[0],:] = 128
-                mask[:,mask_dim[1]-n_pix:mask_dim[1]] = 128
+                flagimg[0:n_pix,:] = 128
+                flagimg[:,0:n_pix] = 128
+                flagimg[flag_dim[0]-n_pix:flag_dim[0],:] = 128
+                flagimg[:,flag_dim[1]-n_pix:flag_dim[1]] = 128
 
-                index_y,index_x=np.where(mask==0)
+                index_y,index_x=np.where(flagimg==0)
                 if len(index_y)==0:
                     continue
                 xrange=[index_x.min(),index_x.max()]
@@ -979,17 +999,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 expimg[:,xrange[1]:]=0
                 expimg[:,:xrange[0]]=0
 
-                # for this fix to work, also need to correct expimg so mask = expimg (see line 869-870)
-                # quick 'n dirty fix for python DRP - TO DO: perhaps convert flag back to binary so we can choose exactly what pixels to keep/mask
-                # see https://github.com/Keck-DataReductionPipelines/KCWI_DRP/issues/98 "Flag and mask handling not (yet) consistent"
-                cond = (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] > 0) & (mask[yrange[0]:yrange[1], xrange[0]:xrange[1]] < 128)
-                mask[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 0
-                expimg[yrange[0]:yrange[1], xrange[0]:xrange[1]][cond] = 1 # unity so that weighting isn't affected
+                # flagimg[yrange[1]-trim[1,i]+1:,:]=128
+                # flagimg[:yrange[0]+trim[0,i],:]=128
+                # flagimg[:,xrange[1]:]=128
+                # flagimg[:,:xrange[0]]=128
 
                 hdu_i.data[kk,:,:]=img
                 hdu_v.data[kk,:,:]=var
                 hdu_m.data[kk,:,:]=mask
                 hdu_e.data[kk,:,:]=expimg
+                # hdu_f.data[kk,:,:]=flagimg
 
             # flux correction
             hdu_i.data = hdu_i.data * fluxnorm[i]
@@ -1001,6 +1020,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdu_v.writeto(trimvfn[i],overwrite=True)
             hdu_m.writeto(trimmfn[i],overwrite=True)
             hdu_e.writeto(trimefn[i],overwrite=True)
+            # hdu_f.writeto(trimffn[i],overwrite=True)
 
         # Montage
         if method.lower()=='drizzle':
@@ -1008,16 +1028,19 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             montvfn=trimvfn[i].replace('.trim.fits','.mont.fits')
             montmfn=trimmfn[i].replace('.trim.fits','.mont.fits')
             montefn=trimefn[i].replace('.trim.fits','.mont.fits')
+            # montffn=trimffn[i].replace('.trim.fits','.mont.fits')
         else:
             montfn=trimfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montvfn=trimvfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montmfn=trimmfn[i].replace('.trim.fits','.'+method_flag+'.fits')
             montefn=trimefn[i].replace('.trim.fits','.'+method_flag+'.fits')
+            # montffn=trimffn[i].replace('.trim.fits','.'+method_flag+'.fits')
 
         montfns.append(montfn)
         montvfns.append(montvfn)
         montmfns.append(montmfn)
         montefns.append(montefn)
+        # montffns.append(montffn)
 
 
         if (not os.path.isfile(montfn)) or overwrite==True:
@@ -1057,6 +1080,14 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdue.writeto(montefn,overwrite=True)
                 hdua.writeto(montefn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
 
+                # hdutf=(fits.open(trimffn[i]))[0]
+                # hdutf.data[np.isfinite(hdutf.data)==False]=0.
+                # newf,newa=reproject_interp(hdutf,newhdr,order='bilinear',independent_celestial_slices=True)
+                # hduf=fits.PrimaryHDU(newf,newhdr)
+                # hdua=fits.PrimaryHDU(newa,newhdr)
+                # hduf.writeto(montffn,overwrite=True)
+                # hdua.writeto(montffn.replace('.'+method_flag,'.'+method_flag+'_area'),overwrite=True)
+
             else:
                 # using shell version for now because of memory leakage of MontagePy
                 exe="mProjectCube -z "+str(drizzle)+" -f "+trimfn[i]+" "+montfn+" "+fnhdr
@@ -1067,6 +1098,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 voidm=os.system(exem)
                 exee="mProjectCube -z "+str(drizzle)+" -f  "+trimefn[i]+" "+montefn+" "+fnhdr
                 voide=os.system(exee)
+                # exef="mProjectCube -z "+str(drizzle)+" -f  "+trimffn[i]+" "+montffn+" "+fnhdr
+                # voidf=os.system(exef)
 
                 #void=mProjectCube(trimfn[i],montfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
                 #voidv=mProjectCube(trimvfn[i],montvfn,fnhdr,drizzle=drizzle,energyMode=True,fullRegion=True)
@@ -1080,6 +1113,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         vdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
         edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
+        # fdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         for i in range(len(fn)):
             newcube=fits.open(montfns[i])[0].data
             newcube[~np.isfinite(newcube)]=0.
@@ -1089,10 +1123,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             newcubem[~np.isfinite(newcubem)]=128
             newcubee=fits.open(montefns[i])[0].data
             newcubee[~np.isfinite(newcubee)]=0.
+            # newcubef=fits.open(montffns[i])[0].data
+            # newcubef[~np.isfinite(newcubef)]=0.
             data0[i,:,:,:]=newcube
             vdata0[i,:,:,:]=newcubev
             mdata0[i,:,:,:]=newcubem
             edata0[i,:,:,:]=newcubee
+            # fdata0[i,:,:,:]=newcubef
             #data0.append(newcube)
             #vdata0.append(newcubev)
             #mdata0.append(newcubem)
@@ -1108,6 +1145,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     data_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
     vdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
     edata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
+    # fdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.float64)
     mdata_3d=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3']),dtype=np.int16)+1
     for ii in tqdm(range(dimension[0])):
 
@@ -1116,12 +1154,14 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             var=vdata0[:,:,:,ii]
             mask=mdata0[:,:,:,ii]
             exp=edata0[:,:,:,ii]
+            # flag=fdata0[:,:,:,ii]
         else:
             #cache columns
             img = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             var = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             mask = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             exp = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
+            # flag = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             for i in range(len(fn)):
                 newcube=fits.open(montfns[i])[0].data
                 newcube[~np.isfinite(newcube)]=0.
@@ -1131,17 +1171,20 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 newcubem[~np.isfinite(newcubem)]=128
                 newcubee=fits.open(montefns[i])[0].data
                 newcubee[~np.isfinite(newcubee)]=0.
+                # newcubef=fits.open(montffns[i])[0].data
+                # newcubef[~np.isfinite(newcubef)]=0.
                 img[i,:,:]=newcube[:, :, ii]
                 var[i,:,:]=newcubev[:, :, ii]
                 mask[i,:,:]=newcubem[:, :, ii]
                 exp[i,:,:]=newcubee[:, :, ii]
+                # flag[i,:,:]=newcubef[:, :, ii]
 
 
         mask[~np.isfinite(img)]=1
         mask[~np.isfinite(var)]=1
         mask[var==0]=1
 
-        q=(exp!=0) #mask == 0
+        q=(mask==0)
         if np.sum(q)==0:
             continue
 
@@ -1150,13 +1193,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         fluxweight = 1 / np.repeat(np.repeat(np.array(fluxnorm**2)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2)
         if len(weights)==0:
-            weight = exp.copy() * fluxweight #exp.copy()
+            weight = exp.copy() * fluxweight
         else:
             weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
 
-        exp[exp==1] = 0 #these were bad pixels so set exposure time to zero
 
         #weight[~np.isfinite(weight)]=0
 
@@ -1170,6 +1212,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         else:
             edata_3d[ii,:,:] = np.transpose(np.sum(exp * weight * np.isfinite(weight), axis=0))
         mdata_3d[ii,:,:]=(edata_3d[ii,:,:]==0).astype(int)
+        # fdata_3d[ii,:,:]=np.transpose(np.nanmax(flag,axis=0)) #np.nansum()?
+
 
 
     # remove temp files
@@ -1179,22 +1223,26 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             os.remove(montvfns[i])
             os.remove(montmfns[i])
             os.remove(montefns[i])
+            os.remove(montffns[i])
             if method.lower()=='drizzle':
                 os.remove(montfns[i].replace('mont','mont_area'))
                 os.remove(montvfns[i].replace('mont','mont_area'))
                 os.remove(montmfns[i].replace('mont','mont_area'))
                 os.remove(montefns[i].replace('mont','mont_area'))
+                os.remove(montffns[i].replace('mont','mont_area'))
             else:
                 os.remove(montfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
                 os.remove(montvfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
                 os.remove(montmfns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
                 os.remove(montefns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
+                os.remove(montffns[i].replace('.'+method_flag,'.'+method_flag+'_area'))
 
         if keep_trim==False:
             os.remove(trimfn[i])
             os.remove(trimvfn[i])
             os.remove(trimmfn[i])
             os.remove(trimefn[i])
+            os.remove(trimffn[i])
 
     # write
     vhdr0=hdr0.copy()
@@ -1211,6 +1259,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
     ehdr0=hdr0.copy()
     ehdr0['BUNIT']='s'
+
+    # fhdr0=hdr0.copy()
+    # fhdr0['BUNIT']='s'
 
     if method.lower()!='drizzle':
         suffix_all=suffix+'_'+method_flag[0]
@@ -1231,6 +1282,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdu_m.writeto(fnlist.replace('.list','_m'+suffix_all+'.fits'),overwrite=True)
     hdu_e=fits.PrimaryHDU(edata_3d.T,header=ehdr0)
     hdu_e.writeto(fnlist.replace('.list','_e'+suffix_all+'.fits'),overwrite=True)
+    # hdu_f=fits.PrimaryHDU(fdata_3d.T,header=fhdr0)
+    # hdu_f.writeto(fnlist.replace('.list','_f'+suffix_all+'.fits'),overwrite=True)
 
     if use_astrom:
         # wavelength range
