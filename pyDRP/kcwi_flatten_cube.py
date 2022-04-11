@@ -2,8 +2,6 @@ import argparse
 import os
 from datetime import datetime
 
-import pdb
-
 #Third-party Imports
 from astropy.io import fits
 import numpy as np
