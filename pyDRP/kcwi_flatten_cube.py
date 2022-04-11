@@ -41,6 +41,8 @@ def main(file, reverse=False, trim=0):
     for cfile in file:
         # Check file exist
         if os.path.isfile(cfile):
+
+            print(pre + 'Operating - ' + cfile)
             # Read cube
             hdl_cub = fits.open(cfile)
             # Number of extensions
@@ -162,7 +164,7 @@ def main(file, reverse=False, trim=0):
             
             hdl_cub.writeto(ofil, overwrite=True)
             
-            return
+    return
             
 
 
