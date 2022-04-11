@@ -5,7 +5,6 @@ import os
 from astropy.io import fits
 import numpy as np
 
-import pdb
 
 def parser_init():
     description = 'Create 2D pseudo-white-light image.'
