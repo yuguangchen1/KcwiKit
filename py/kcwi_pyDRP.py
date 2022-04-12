@@ -28,7 +28,7 @@ from fpdf import FPDF
 from tqdm import tqdm
 import pdb
 import time as ostime
-
+from cwitools.synthesis import whitelight
 
 # Read parameter files for alignment, stacking, and astrometry
 def kcwi_stack_readpar(parname='q0100-bx172.par'):
@@ -2131,3 +2131,173 @@ def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secre
         print('title: %s, id: %s' % (f['title'], f['id']))
 
     return
+
+
+def kcwi_reg_fits(imfname, regfname):
+
+    """Creates mask image from ds9 region file.
+
+    Args:
+        imagename (string): The name of a *_intf.fits image
+        regionname (string): The name of a ds9 region file
+
+    Returns:
+        None
+
+    Note:
+        To use this routine, process your data with kcwi_stage4flat.pro.
+        Then display the target *_intf.fits file in ds9.
+        Use region shapes to indicate non-sky pixels in image (box, circle, etc.).
+        Write out ds9 region file (*.reg).
+        Run this routine:
+
+        python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111_intf.fits ds9.reg
+
+        (replace paths/filenames with your local paths/filenames)
+
+        This should create kb180101_00111_smsk.fits, which will be used when you
+        run kcwi_stage5sky.pro.
+    """
+    try:
+        import astropy
+    except ImportError:
+        print("Please install astropy: required for image I/O")
+        quit()
+    try:
+        import pyregion
+    except ImportError:
+        print("Please install pyregion: required for DS9 region I/O")
+        quit()
+    import numpy as np
+    import sys
+    import os
+    import pdb
+
+    # # check args
+    # narg=len(sys.argv)
+    #
+    # # should be three (including routine name)
+    # if narg != 3:
+    #     print("Usage: python kcwi_masksky_ds9.py <imagename> <regionname>")
+    #     print("imagename : used for array dimensions and filename purposes, ")
+    #     print("            must be an _intf image.")
+    #     print("regionname: name of region file containing ds9 mask regions")
+    #     print("            (typically a .reg)")
+    #     exit()
+    #
+    # # read arg values
+    # imfname=sys.argv[1]
+    # regfname=sys.argv[2]
+
+    # make sure it's an _intf image
+    #if '_intf.fits' not in imfname:
+    #    print("imagename must be _intf.fits image")
+    #    exit()
+
+    # do inputs exist?
+    if os.path.exists(imfname) == False:
+        print("File does not exist: "+imfname)
+        exit()
+
+    if os.path.exists(regfname) == False:
+        print("File does not exist: "+regfname)
+        exit()
+
+    # create output mask image name
+    outfile=imfname.replace("whitelight", "mask2d")
+    print("Creating: "+outfile)
+
+    # load the header from the pointed-to image.
+    hdu_list = astropy.io.fits.open(imfname)
+    header= hdu_list[0].header
+    #print(header)
+
+    # determine the size of the array
+    shape = (header["NAXIS1"], header["NAXIS2"])
+    #print(shape)
+    # load in the region file
+    r = pyregion.open(regfname).as_imagecoord(header)
+    print(r[0].coord_format)
+    m = r.get_mask(hdu=hdu_list[0])
+    #print(r)
+    #print(m[m!=True])
+    #pdb.set_trace()
+
+    # write out the mask
+    hdu = astropy.io.fits.PrimaryHDU(np.uint8(m))
+    hdu.writeto(outfile, overwrite=True)
+
+    print("Done.")
+
+
+def kcwi_makemask(fn, mask=None, cubed=False):
+    import pyds9, time
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
+
+    regfn = fn.split('.')[0]+'_i'+suffix+'_mask2d.reg'
+    imgfn=regfn.replace('mask2d.reg','whitelight.fits')
+    stack = fits.open(fn.split('.')[0]+'_i'+suffix+'.fits')
+
+    if mask == None:
+        if not os.path.exists(regfn):
+            whtlight = whitelight(stack)
+            whtlight[0].writeto(imgfn, overwrite=True) #whtlight[1] is variance image
+
+            d = pyds9.ds9('whitelight')
+            d.set(f"file {imgfn}")
+            d.set('height 1200')
+            d.set('width 800')
+            d.set('zscale')
+            d.set('mode region')
+            d.set('regions system physical')
+            d.set(f"regions save {regfn}")
+            d.set('regions shape ellipse')
+            d.set('zoom to fit')
+
+            # os.system(f"ds9 {fn.split('.')[0]+'_i'+suffix+'_whitelight.fits'} -regions save {fn.split('.')[0]+'_i'+suffix+'_mask.reg'} -title whitelight_mask -height 1200 -width 800 -zscale -mode region -regions shape ellipse -zoom to fit -regions system physical &")
+
+            mask_orig_size = os.path.getsize(regfn)
+
+            while os.path.getsize(regfn) == mask_orig_size:
+                time.sleep(1)
+
+        # convert to *_mask2d.fits
+        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_mask2d.fits'):
+            kcwi_reg_fits(imgfn, regfn)
+
+
+        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits'):
+            msk_2d = fits.open(fn.split('.')[0]+'_i'+suffix+'_mask2d.fits')
+            msk_3d = stack.copy()
+            for wave in range(stack[0].header['NAXIS3']):
+                msk_3d[0].data[wave,:,:] = msk_2d[0].data # since we didn't supply a 3D mask
+            msk_3d.writeto(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits')
+
+    else:
+        print('External Mask Incorporation to be developed soon!')
+
+def kcwi_deproject(fn, cubed=False):
+
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
+
+    msk_3d = fits.open(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits')
+
+    trim_tab=ascii.read(fn,format="no_header")
+    files=trim_tab["col1"]
+    for file in tqdm(files):
+        trimfn = file.split('kb')[1]
+        print('kb'+trimfn)
+        trim = fits.open('kcwi_stack/kb'+trimfn+'_i'+suffix+'.trim.fits')[0]
+        img, arr = reproject_interp(msk_3d, trim.header, order = 'bicubic')
+        img[np.isnan(trim.data)]=np.nan
+        fits.PrimaryHDU(np.round(img)).writeto('../redux/kb'+trimfn+'_icubes.stackmask.fits', overwrite=True)
+        # fig, ax = plt.subplots(1,2)
+        # ax[0].imshow(img[5,:,:], origin='lower')
+        # ax[1].imshow(trim.data[1778,:,:], origin = 'lower')
+        # plt.show()
