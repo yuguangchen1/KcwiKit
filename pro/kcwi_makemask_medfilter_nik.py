@@ -20,12 +20,12 @@ for regfn in glob.glob(dir+"/*_icube.thum.reg"):
     #pdb.set_trace()
     
     imgfn=regfn.replace('.reg','.fits')
-    os.system("/Users/nik/Software/KCWI_post_IDL_DRP/kcwi_masksky_ds9_thum.py "+imgfn+" "+regfn) 
+    os.system("/Users/nik/Software/kcwi/pro/kcwi_masksky_ds9_thum.py "+imgfn+" "+regfn) 
 
 for regfn in glob.glob(dir+"/*_icube_2d.reg"):
     #pdb.set_trace()
     
     imgfn=regfn.replace('.reg','.fits')
-    os.system("/Users/nik/Software/KCWI_post_IDL_DRP/kcwi_masksky_ds9_2d.py "+imgfn+" "+regfn) 
+    os.system("/Users/nik/Software/kcwi/pro/kcwi_masksky_ds9_2d.py "+imgfn+" "+regfn) 
 
 

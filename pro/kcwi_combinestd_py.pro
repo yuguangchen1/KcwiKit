@@ -1,4 +1,4 @@
-pro kcwi_combinestd,listfn,noplot=noplot,extension=ext
+pro kcwi_combinestd_py,listfn,noplot=noplot,extension=ext
 
 if ~keyword_set(noplot) then noplot=0
 if ~keyword_set(ext) then ext='' else begin

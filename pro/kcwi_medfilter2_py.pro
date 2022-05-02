@@ -140,11 +140,11 @@ for i=0,n_elements(files)-1 do begin
 	; print,file_basename(cubefn)
 	if file_test(cubefn) eq 0 then continue
 	; mcubefn=repstr(cubefn,'_icube','_mcube')
-	mimgfn1=file_dirname(cubefn)+'/'+file_basename(cubefn,'.fits')+'.mask2.fits'
+	mimgfn1=file_dirname(cubefn)+'/'+file_basename(cubefn,'.fits')+'.stackmask.fits'
 	print,cubefn
 	print,mimgfn1
 
-	mimgfn2=file_dirname(cubefn)+'/'+file_basename(cubefn,'.fits')+'_2d.mask.fits'
+	; mimgfn2=file_dirname(cubefn)+'/'+file_basename(cubefn,'.fits')+'_2d.mask.fits'
 	; print,mcubefn,mimgfn1,mimgfn2
 	; read files
 	cube=mrdfits(cubefn,0,hdr,/silent)
@@ -155,16 +155,17 @@ for i=0,n_elements(files)-1 do begin
 	print,file_basename(cubefn)
 
 	; check header
-	if sxpar(hdr,'medfilt') eq 1 then begin
-		if keyword_set(overwrite) then begin
-			cube=mrdfits(file_dirname(cubefn)+'/old/'+file_basename(cubefn),$
-				0,hdr,/silent)
-			nocopy=1
-		endif else begin
-			print,' Already processed. Skipping...'
-			continue
-		endelse
-	endif
+	; if sxpar(hdr,'medfilt') eq 1 then begin
+	; 	if keyword_set(overwrite) then begin
+	; 		cube=mrdfits(file_dirname(cubefn)+'/old/'+file_basename(cubefn),$
+	; 			0,hdr,/silent)
+	; 		nocopy=1
+	; 		print,' Overwrite=True, Using original icube file'
+	; 	endif else begin
+	; 		print,' Already processed. Skipping...'
+	; 		continue
+	; 	endelse
+	; endif
 
 
 	cube0=cube
@@ -180,11 +181,11 @@ for i=0,n_elements(files)-1 do begin
 	endif else begin
 		mimg1=fltarr(sz[0],sz[1])
 	endelse
-	if file_test(mimgfn2) then begin
-		mimg2=mrdfits(mimgfn2,0,/silent)
-	endif else begin
-		mimg2=0.
-	endelse
+	; if file_test(mimgfn2) then begin
+	; 	mimg2=mrdfits(mimgfn2,0,/silent)
+	; endif else begin
+	mimg2=0.
+	; endelse
 
 
 	wave=(findgen(sz[2])-sxpar(hdr,'crpix3')+1)*sxpar(hdr,'cd3_3')+sxpar(hdr,'crval3')
@@ -449,7 +450,7 @@ for i=0,n_elements(files)-1 do begin
 
 
 	; write
-	sxaddpar,hdr,'medfilt',1
+	sxaddpar,hdr,'medfilt',2
 	if nocopy eq 0 then begin
 		if ~file_test(file_dirname(cubefn)+'/old') then begin
 			spawn,'mkdir '+file_dirname(cubefn)+'/old'
