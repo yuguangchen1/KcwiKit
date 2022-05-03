@@ -45,7 +45,7 @@ def main(file, reverse=False, trim=0):
             hdl_cub = fits.open(cfile)
             # Number of extensions
             n_ext = len(hdl_cub)
-            
+
             # Loop through all extensions
             for i_ext, hdu_cub in enumerate(hdl_cub):
 
@@ -78,7 +78,7 @@ def main(file, reverse=False, trim=0):
                     else:
                         # output image
                         oim = np.zeros((hdu_cub.shape[0], hdu_cub.shape[2] * hdu_cub.shape[1]))
-                        
+
                         # pack slices
                         for i in range(hdu_cub.shape[2]):
                             ix0 = trim
@@ -144,7 +144,7 @@ def main(file, reverse=False, trim=0):
 
                         hdu_cub.data = oim
 
-                    #hdl_cub[i_ext] = hdu_cub    
+                    #hdl_cub[i_ext] = hdu_cub
 
                 else:
                     print(pre + ': Data not in 3D - ' + cfile + ' Ext [{0:d}]'.format(i_ext))
@@ -159,11 +159,11 @@ def main(file, reverse=False, trim=0):
                 # get 2d file name
                 ofil = cfile.replace('.fits', '_2d.fits')
 
-            
+
             hdl_cub.writeto(ofil, overwrite=True)
-            
+
     return
-            
+
 
 
 
@@ -172,9 +172,3 @@ def main(file, reverse=False, trim=0):
 if __name__ == '__main__':
     args = parser_init()
     main(**(vars(args)))
-    
-
-
-
-
-

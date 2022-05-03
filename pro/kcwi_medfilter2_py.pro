@@ -180,6 +180,7 @@ for i=0,n_elements(files)-1 do begin
 		mimg1=mrdfits(mimgfn1,0,/silent)
 	endif else begin
 		mimg1=fltarr(sz[0],sz[1])
+		continue
 	endelse
 	; if file_test(mimgfn2) then begin
 	; 	mimg2=mrdfits(mimgfn2,0,/silent)
