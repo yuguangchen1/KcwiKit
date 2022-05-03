@@ -14,7 +14,7 @@ from scipy.interpolate import CubicSpline, interp1d
 
 
 from tqdm import tqdm
-#import pdb
+import pdb
 
 
 
@@ -203,12 +203,30 @@ def kcwi_medfilter_actonone(args, par):
         flagcube[cube == 0] = 1; cube[cube==0] = np.nan
 
         # masking
-        cube[mcube != 0] = np.nan; flagcube[mcube != 0] = -100
-        cube[fcube != 0] = np.nan; flagcube[fcube != 0] = -100
+        #cube[mcube != 0] = np.nan; 
+        flagcube[mcube != 0] = -100
+        #cube[fcube != 0] = np.nan; 
+        flagcube[fcube != 0] = -100
 
         # temp fix for out-of-FoV
         flagcube[fcube > 100] = 1
-        
+
+        # temp fix of flag ripple
+        for kk in range(shape[0]):
+            # determine good data range in y direction
+            goodrange_y, goodrange_x = np.where(flagcube[kk, :, :] == 0)
+            if len(goodrange_y)!=0:
+                yrange = (np.min(goodrange_y), np.max(goodrange_y))
+                for ii in range(shape[2]):
+                    index = (flagcube[kk, :, ii] == -100)
+                    # almost the entire vertical line is flagged?
+                    if np.sum(index) >= yrange[1] - yrange[0] - 3:
+                        flagcube[kk, index, ii] = 0
+
+        cube[flagcube != 0] = np.nan
+        #hdu_tmp = fits.PrimaryHDU(flagcube)
+        #hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
+
         # emission line mask
         if mimg2 is not None:
             # resemble cube - copied from kcwi_flatten_cube
