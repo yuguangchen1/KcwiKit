@@ -200,22 +200,18 @@ def kcwi_medfilter_actonone(args, par):
             return
 
         # padded
-        flagcube[cube == 0] = 1
-        # cube[cube==0] = np.nan
-        # cube[(fcube != 0) & (mcube == 1)] = 0
+        flagcube[cube == 0] = 1; cube[cube==0] = np.nan
 
         # masking
-        #cube[mcube != 0] = np.nan;
-        flagcube[mcube != 0] = -100
+        cube[mcube == 0] = np.nan
+        flagcube[mcube == 0] = -100 #opposite convention
         # cube[fcube != 0] = np.nan;
-        # flagcube[(fcube != 0) & (mcube == 1)] = -100
-
-        flagcube[fcube != 0] = -100
+        flagcube[(fcube != 0) & (mcube != 0)] = -100 #inside data region, but flagged
 
         # temp fix for out-of-FoV
-        # flagcube[mcube == 0] = 1
+        # flagcube[fcube > 100] = 1
 
-        # # temp fix of flag ripple
+        # temp fix of flag ripple
         # for kk in range(shape[0]):
         #     # determine good data range in y direction
         #     goodrange_y, goodrange_x = np.where(flagcube[kk, :, :] == 0)
@@ -228,11 +224,10 @@ def kcwi_medfilter_actonone(args, par):
         #                 flagcube[kk, index, ii] = 0
 
         cube[flagcube != 0] = np.nan
-        cube0[(fcube != 0) & (mcube == 1)] = np.nan
-        # hdu_tmp = fits.PrimaryHDU(flagcube)
-        # hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
-        #
-        # fits.PrimaryHDU(cube).writeto('tmp_cube.fits', overwrite=True)
+        hdu_tmp = fits.PrimaryHDU(flagcube)
+        hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
+
+        fits.PrimaryHDU(cube).writeto('tmp_cube.fits', overwrite=True)
 
         # emission line mask
         if mimg2 is not None:
@@ -245,57 +240,58 @@ def kcwi_medfilter_actonone(args, par):
                 ox0 = ii * shape[1] + trm
                 ox1 = (ii + 1) * shape[1] - trm
                 mcube2[:, ix0:ix1, ii] = mimg2[:, ox0:ox1]
-            cube[(mcube2 != 0) & (flagcube != 1)] = np.nan
-            flagcube[(mcube2 != 0) & (flagcube != 1)] = -100
+            cube[mcube2 != 0] = np.nan
+            flagcube[mcube2 != 0] = -100
 
         # continuum mask
         qq = (mimg1 != 0)
         if np.sum(qq) != 0:
             for kk in range(shape[0]):
-                cube[kk][qq & (flagcube[kk, :, :]!=1)] = np.nan
-                flagcube[kk][qq & (flagcube[kk, :, :]!=1)] = - 100
+                cube[kk][qq] = np.nan
+                flagcube[kk][qq] = -100
 
         # 2nd pass mask
         if mstack is not None:
 
             # masked pixels
             index = (mstack == 1)
-            cube[index & (flagcube != 1)] = np.nan
-            flagcube[index & (flagcube != 1)] = -200 #-100
+            cube[index] = np.nan
+            flagcube[index] = -100
 
-        #     # out of FoV pixels
-        #     index = ~np.isfinite(mstack)
-        #     cube[index & (flagcube != 1)] = np.nan
-        #     flagcube[index & (flagcube != 1)] = -200
-        #
-        # # temp fix the edges in flag cubes after DAR
+            # out of FoV pixels - do we need this? probably yes in case of NaNs
+            index = ~np.isfinite(mstack)
+            cube[index] = np.nan
+            flagcube[index] = -200
+
+        # # temp fix the edges in flag cubes after DAR - this is done earlier
         # flagcube[:, 0, :] = 1
         # flagcube[:, -1, :] = 1
         # flagcube[:, :, 0] = 1
         # flagcube[:, :, -1] = 1
 
 
-        # trim
+        # trim - what is this for??
         for kk in range(shape[0]):
             for ii in range(shape[2]):
                 line = cube[kk, :, ii]
                 flagline = flagcube[kk, :, ii]
 
                 # edges of unpadded value
-                qgood = np.where((flagline != -200) & (flagline != 1) )[0]
+                qgood = np.where(flagline != -200)[0]
                 if len(qgood) > 0:
                     qmin, qmax = np.min(qgood), np.max(qgood)
+                    # print(qmin, qmax)
 
                     # lower
                     smallline = line[:qmin + par['ytrim']]
                     smallflag = flagline[:qmin + par['ytrim']]
-                    smallline[smallflag != 1] = np.nan
-                    smallflag[smallflag != 1] = -200
+                    smallline = np.nan
+                    smallflag = -200
                     # upper
                     smallline = line[qmax - par['ytrim'] + 1:]
                     smallflag = flagline[qmax - par['ytrim'] + 1:]
-                    smallline[smallflag != 1] = np.nan
-                    smallflag[smallflag != 1] = -200
+                    smallline = np.nan
+                    smallflag = -200
 
 
         """
@@ -311,7 +307,7 @@ def kcwi_medfilter_actonone(args, par):
         smallflagcube[smallflagcube != 1] = -200
         """
 
-
+        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube-2.fits', overwrite=True)
         # construct the raw median cube
         medcube = np.zeros(shape)
         for ii in tqdm(range(shape[2]), desc=par['fn']):
@@ -330,16 +326,16 @@ def kcwi_medfilter_actonone(args, par):
                     medcube[kk, jj, ii] = np.nanmedian(cube[zrange[0]:zrange[1], yrange[0]:yrange[1], ii])
 
         # interpolate bad data
-
+        """
         hdu_tmp = fits.PrimaryHDU(medcube)
         hdu_tmp.writeto('tmp.fits', overwrite=True)
         hdu_tmp = fits.PrimaryHDU(flagcube)
         hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
-        """
+
         medcube = fits.open('tmp.fits')[0].data
         flagcube = fits.open('tmp_flag.fits')[0].data
         """
-        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube0.fits', overwrite=True)
+
         # interpolate along the slices
         for ii in range(shape[2]):
             for kk in range(shape[0]):
@@ -350,9 +346,10 @@ def kcwi_medfilter_actonone(args, par):
                 flagline = flagline0
 
                 qv = (flagline == 0)
+                # print(np.sum(qv))
                 if np.sum(qv) == 0:
                     # No good data
-                    flagline0[(~qv) & (flagline != 1)] = -300 # interp in wavelength
+                    flagline0[~qv] = -300 # interp in wavelength
 
                 else:
                     # find good data limits
@@ -431,9 +428,9 @@ def kcwi_medfilter_actonone(args, par):
                                 bounds_error=False, fill_value='extrapolate')
                         tmpmed[qlin3] = li(qlin3)
 
-        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube.fits', overwrite=True)
+        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube-3.fits', overwrite=True)
         # recover padding
-        medcube[flagcube==1] = 0
+        medcube[flagcube!=0] = 0
 
         # subtract
         cube1 = cube0 - medcube

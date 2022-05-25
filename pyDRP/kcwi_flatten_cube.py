@@ -18,6 +18,9 @@ def parser_init():
     parser.add_argument('-r', '--reverse', dest='reverse',
             action='store_true',
             help='Reverse the flattening')
+    parser.add_argument('-m', '--mask', dest='mask',
+            action='store_true',
+            help='2D Mask (e.g. *_icubes_2d.mask.fits)')
     parser.add_argument('-t', '--trim', dest='trim',
             action='store_const', const=0, default=0,
             help='Pixels to be trimmed')
@@ -28,7 +31,7 @@ def parser_init():
 
 
 
-def main(file, reverse=False, trim=0):
+def main(file, reverse=False, mask = False, trim=0):
 
     pre = 'kcwi_flatten_cube.py'
 
@@ -56,7 +59,10 @@ def main(file, reverse=False, trim=0):
                     if reverse:
                         #
                         # Read in 2d file
-                        tfil = cfile.replace('.fits', '_2d.fits')
+                        if mask:
+                            tfil = cfile.replace('.fits', '_2d.mask.fits')
+                        else:
+                            tfil = cfile.replace('.fits', '_2d.fits')
                         # check 2d
                         if os.path.exists(tfil):
                             # read in 2d file
@@ -154,7 +160,10 @@ def main(file, reverse=False, trim=0):
             # Write
             if reverse:
                 # get 3D file name
-                ofil = tfil.replace('_2d.fits', '_3d.fits')
+                if mask:
+                    ofil = tfil.replace('_2d.mask.fits', '_3d.mask.fits')
+                else:
+                    ofil = tfil.replace('_2d.fits', '_3d.fits')
             else:
                 # get 2d file name
                 ofil = cfile.replace('.fits', '_2d.fits')

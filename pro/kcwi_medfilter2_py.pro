@@ -232,7 +232,7 @@ for i=0,n_elements(files)-1 do begin
 
 
 	; masking
-	q=where(mcube ne 0)
+	q=where(mcube ne 1)
 	if q[0] ne -1 then begin
 		cube[q]=0.
 	endif

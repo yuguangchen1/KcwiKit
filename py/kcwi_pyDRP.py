@@ -619,7 +619,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, n_pix_trim = 4):
+               use_regmask=True, low_mem=False, n_pix_trim = 2):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -861,13 +861,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdu_i.data[:,mask_reg] = np.nan
                 hdu_v.data[:,mask_reg] = np.Inf
-                hdu_m.data[:,mask_reg] = 128
+                hdu_f.data[:,mask_reg] = 128
 
             # Infinity check
             q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
             hdu_i.data[q]=np.nan
             hdu_v.data[q]=np.Inf
-            hdu_m.data[q]=128
+            hdu_f.data[q]=128
 
 
             # check EXPTIME
@@ -876,11 +876,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             print('     EXPTIME = '+str(exptime))
             etime[i]=exptime
             edata=hdu_i.data*0.+exptime
-            q=(hdu_m.data != 0)
+            q=(hdu_f.data != 0)
             edata[q]=0
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
 
+            hdu_i.data[(hdu_f.data != 0) & (hdu_m.data == 1)] = np.nan
 
             # have to use surface brightness for now, mProjectCube has bug with brightness units combined with drizzle scale
             dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
@@ -964,13 +965,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 flag_dim = mask.shape
                 # set edge pixels = 128
-                n_pix = n_pix_trim # nominally 4 pix, really only need 1
-                flagimg[0:n_pix,:] = 128
-                flagimg[:,0:n_pix] = 128
-                flagimg[flag_dim[0]-n_pix:flag_dim[0],:] = 128
-                flagimg[:,flag_dim[1]-n_pix:flag_dim[1]] = 128
+                # n_pix = n_pix_trim # nominally 4 pix, really only need 1
+                # flagimg[0:n_pix,:] = 128
+                # flagimg[:,0:n_pix] = 128
+                # flagimg[flag_dim[0]-n_pix:flag_dim[0],:] = 128
+                # flagimg[:,flag_dim[1]-n_pix:flag_dim[1]] = 128
 
-                index_y,index_x=np.where(flagimg==0)
+                index_y,index_x=np.where(mask==1)
                 if len(index_y)==0:
                     continue
                 xrange=[index_x.min(),index_x.max()]
@@ -981,32 +982,40 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 img[yrange[1]-trim[1,i]+1:,:]=np.nan
                 img[:yrange[0]+trim[0,i],:]=np.nan
-                img[:,xrange[1]:]=np.nan # need to deal with vertical stripes along side
+                img[:,xrange[1]+1:]=np.nan # need to deal with vertical stripes along side
                 img[:,:xrange[0]]=np.nan # in pyDRP since img is nonzero there (~1e-6)
 
                 var[yrange[1]-trim[1,i]+1:,:]=np.Inf
                 var[:yrange[0]+trim[0,i],:]=np.Inf
-                var[:,xrange[1]:]=np.Inf
+                var[:,xrange[1]+1:]=np.Inf
                 var[:,:xrange[0]]=np.Inf
 
                 mask[yrange[1]-trim[1,i]+1:,:]=128
                 mask[:yrange[0]+trim[0,i],:]=128
-                mask[:,xrange[1]:]=128
+                mask[:,xrange[1]+1:]=128
                 mask[:,:xrange[0]]=128
 
                 expimg[yrange[1]-trim[1,i]+1:,:]=0
                 expimg[:yrange[0]+trim[0,i],:]=0
-                expimg[:,xrange[1]:]=0
+                expimg[:,xrange[1]+1:]=0
                 expimg[:,:xrange[0]]=0
 
-                # flagimg[yrange[1]-trim[1,i]+1:,:]=128
-                # flagimg[:yrange[0]+trim[0,i],:]=128
-                # flagimg[:,xrange[1]:]=128
-                # flagimg[:,:xrange[0]]=128
+                flagimg[yrange[1]-trim[1,i]+1:,:]=128
+                flagimg[:yrange[0]+trim[0,i],:]=128
+                flagimg[:,xrange[1]+1:]=128
+                flagimg[:,:xrange[0]]=128
+
+                # print(kk, xrange, yrange)
+                # print(yrange[0], yrange[1])
+
+                # flagimg[yrange[0]:yrange[1], xrange[0]:xrange[1]] = -1
+
+                # flagimg[yrange[0]:yrange[1], xrange[0]:xrange[1]][flagimg[yrange[0]:yrange[1], xrange[0]:xrange[1]]!=255] = 0
+                # flagimg[yrange[0]:yrange[1], xrange[0]:xrange[1]][flagimg[yrange[0]:yrange[1], xrange[0]:xrange[1]]==255] = 128
 
                 hdu_i.data[kk,:,:]=img
                 hdu_v.data[kk,:,:]=var
-                hdu_m.data[kk,:,:]=mask
+                hdu_m.data[kk,:,:]=flagimg#mask
                 hdu_e.data[kk,:,:]=expimg
                 # hdu_f.data[kk,:,:]=flagimg
 
@@ -1524,20 +1533,20 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         # trim
 
         # need a mask for pyDRP
-        mask=fits.open(fn[i])['FLAGS']
-
-        mask_dim = mask.shape
+        mask=fits.open(fn[i])['MASK']
+        # mask_dim = mask.shape
         # set edge pixels = 128
-        n_pix = n_pix_trim # nominally 4 pix, really only need 1
-        mask.data[:,0:n_pix,:] = 128
-        mask.data[:,:,0:n_pix] = 128
-        mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
-        mask.data[:,:,mask_dim[2]-n_pix:mask_dim[2]] = 128
+        # n_pix = n_pix_trim # nominally 4 pix, really only need 1
+        # mask.data[:,0:n_pix,:] = 128
+        # mask.data[:,:,0:n_pix] = 128
+        # mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
+        # mask.data[:,:,mask_dim[2]-n_pix:mask_dim[2]] = 128
 
         twod_mask = np.nanmedian(mask.data[qwave,:,:], axis = 0).T # don't really need [qwave,:,:]
-        # thum[twod_mask!=0] = np.nan
+        # thum[mask==0] = np.nan
 
-        index_x,index_y=np.where(twod_mask==0)
+        index_x,index_y=np.where(twod_mask==1)
+        # print(index_x, index_y)
         xrange=[index_x.min(),index_x.max()]
         yrange=[index_y.min(),index_y.max()]
         thum[:,yrange[1]-trim[1,i]+1:]=np.nan
@@ -2133,7 +2142,7 @@ def kcwi_upload_google(allfiles, googledirid, jsonfn='../py/pydrive/client_secre
     return
 
 
-def kcwi_reg_fits(imfname, regfname):
+def kcwi_reg_fits(imfname, regfname, outfname):
 
     """Creates mask image from ds9 region file.
 
@@ -2204,7 +2213,7 @@ def kcwi_reg_fits(imfname, regfname):
         exit()
 
     # create output mask image name
-    outfile=imfname.replace("whitelight", "mask2d")
+    outfile = outfname #imfname.replace("whitelight", "mask2d")
     print("Creating: "+outfile)
 
     # load the header from the pointed-to image.
@@ -2230,7 +2239,7 @@ def kcwi_reg_fits(imfname, regfname):
     print("Done.")
 
 
-def kcwi_makemask(fn, mask=None, cubed=False):
+def kcwi_make_cont_mask(fn, mask=None, cubed=False):
     import pyds9, time
     if cubed:
         suffix="cubed"
@@ -2246,7 +2255,7 @@ def kcwi_makemask(fn, mask=None, cubed=False):
             whtlight = whitelight(stack)
             whtlight[0].writeto(imgfn, overwrite=True) #whtlight[1] is variance image
 
-            d = pyds9.ds9('whitelight')
+            d = pyds9.DS9('whitelight')
             d.set(f"file {imgfn}")
             d.set('height 1200')
             d.set('width 800')
@@ -2266,15 +2275,248 @@ def kcwi_makemask(fn, mask=None, cubed=False):
 
         # convert to *_mask2d.fits
         if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_mask2d.fits'):
-            kcwi_reg_fits(imgfn, regfn)
+            kcwi_reg_fits(imgfn, regfn, regfn.replace("reg", "fits"))
 
 
-        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits'):
+        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_mask3d.cont.fits'):
             msk_2d = fits.open(fn.split('.')[0]+'_i'+suffix+'_mask2d.fits')
             msk_3d = stack.copy()
             for wave in range(stack[0].header['NAXIS3']):
                 msk_3d[0].data[wave,:,:] = msk_2d[0].data # since we didn't supply a 3D mask
-            msk_3d.writeto(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits')
+            msk_3d.writeto(fn.split('.')[0]+'_i'+suffix+'_mask3d.cont.fits')
+
+    else:
+        print('External Mask Incorporation to be developed soon!')
+
+import argparse
+import os
+from datetime import datetime
+
+#Third-party Imports
+from astropy.io import fits
+import numpy as np
+
+def parser_init():
+    description = "Flatten or de-flatten cube. This is a replica of kcwi_flatten_cube.pro in the IDL DRP."
+
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        'file',
+        type=str,
+        nargs='+',
+        help='File name')
+    parser.add_argument('-r', '--reverse', dest='reverse',
+            action='store_true',
+            help='Reverse the flattening')
+    parser.add_argument('-m', '--mask', dest='mask',
+            action='store_true',
+            help='2D Mask (e.g. *_icubes_2d.mask.fits)')
+    parser.add_argument('-t', '--trim', dest='trim',
+            action='store_const', const=0, default=0,
+            help='Pixels to be trimmed')
+
+    args = parser.parse_args()
+    return args
+
+
+
+
+def kcwi_flatten_cube(file, reverse=False, mask = False, trim=0):
+
+    pre = 'kcwi_flatten_cube.py'
+
+    # safty to convert string to list
+    if isinstance(file, str):
+        file = [file]
+
+    for cfile in file:
+        # Check file exist
+        if os.path.isfile(cfile):
+
+            print(pre + 'Operating - ' + cfile)
+            # Read cube
+            hdl_cub = fits.open(cfile)
+            # Number of extensions
+            n_ext = len(hdl_cub)
+
+            # Loop through all extensions
+            for i_ext, hdu_cub in enumerate(hdl_cub):
+
+                # 3D?
+                if len(hdu_cub.shape)==3:
+
+                    # Constructing a 3d from 2d
+                    if reverse:
+                        #
+                        # Read in 2d file
+                        if mask:
+                            tfil = cfile.replace('.fits', '_2d.mask.fits')
+                        else:
+                            tfil = cfile.replace('.fits', '_2d.fits')
+                        # check 2d
+                        if os.path.exists(tfil):
+                            # read in 2d file
+                            hdu_img = fits.open(tfil)[i_ext]
+                            img = hdu_img.data
+                            thdr = hdu_img.header
+
+                            # unpack slices
+                            for i in range(hdu_cub.shape[2]):
+                                ix0 = int(trim)
+                                ix1 = int(hdu_cub.shape[1] - trim)
+                                ox0 = int(i * hdu_cub.shape[1] + trim)
+                                ox1 = int((i + 1) * hdu_cub.shape[1] - trim)
+                                hdu_cub.data[:, ix0:ix1, i] = img[:, ox0:ox1]
+                        else:
+                            print(pre + ': 2D version not found - ' + tfil + ' Ext [{0:d}]'.format(i_ext))
+                            return
+                    # flattening a 3d to 2d
+                    else:
+                        # output image
+                        oim = np.zeros((hdu_cub.shape[0], hdu_cub.shape[2] * hdu_cub.shape[1]))
+
+                        # pack slices
+                        for i in range(hdu_cub.shape[2]):
+                            ix0 = trim
+                            ix1 = hdu_cub.shape[1] - trim
+                            ox0 = i * hdu_cub.shape[1] + trim
+                            ox1 = (i + 1) * hdu_cub.shape[1] - trim
+                            oim[:, ox0:ox1] = hdu_cub.data[:, ix0:ix1, i]
+
+                        # get wavelength values
+                        hdr = hdu_cub.header
+                        if 'CRVAL3' in hdr:
+                            w0 = hdr['CRVAL3']
+                            dw = hdr['CD3_3']
+                            crpixw = hdr['CRPIX3']
+                            ctypew = hdr['CTYPE3']
+                            # set spatial scale
+                            s0 = 0.
+                            ds = 24. / (hdu_cub.shape[2] * hdu_cub.shape[1])
+                            crpixs = 1.
+                            # update header
+                            hdr['HISTORY'] = '  ' + pre + datetime.now().ctime()
+                            hdr['INCUBEF'] = (cfile, 'Input cube filename')
+                            # remove old WCS
+                            del hdr['NAXIS3']
+                            del hdr['CTYPE1']
+                            del hdr['CTYPE2']
+                            del hdr['CTYPE3']
+                            del hdr['CUNIT1']
+                            del hdr['CUNIT2']
+                            del hdr['CUNIT3']
+                            del hdr['CNAME1']
+                            del hdr['CNAME2']
+                            del hdr['CNAME3']
+                            del hdr['CRVAL1']
+                            del hdr['CRVAL2']
+                            del hdr['CRVAL3']
+                            del hdr['CRPIX1']
+                            del hdr['CRPIX2']
+                            del hdr['CRPIX3']
+                            del hdr['CD1_1']
+                            del hdr['CD1_2']
+                            del hdr['CD2_1']
+                            del hdr['CD2_2']
+                            del hdr['CD3_3']
+
+                            # set wavelength axis WCS values
+                            hdr['WCSDIM'] = 2
+                            hdr['CTYPE1'] = ('SPATIAL', 'SLICE')
+                            hdr['CUNIT1'] = ('slu', 'SLICE units')
+                            hdr['CNAME1'] = ('KCWI SLICE', 'SLICE name')
+                            hdr['CRVAL1'] = (s0, 'SLICE zeropoint')
+                            hdr['CRPIX1'] = (crpixs, 'SLICE reference pixel')
+                            hdr['CDELT1'] = (ds, 'SLICE per pixel')
+                            hdr['CTYPE2'] = (ctypew, 'Wavelengh')
+                            hdr['CUNIT2'] = ('Angstrom', 'Wavelength units')
+                            hdr['CNAME2'] = ('KCWI 2D Wavelength', 'Wavelength name')
+                            hdr['CRVAL2'] = (w0, 'Wavelength zeropoint')
+                            hdr['CRPIX2'] = (crpixw, 'Wavelength reference pixel')
+                            hdr['CDELT2'] = (dw, 'Wavelength Anstroms per pixel')
+
+                        else:
+                            del hdr['NAXIS3']
+
+                        hdu_cub.data = oim
+
+                    #hdl_cub[i_ext] = hdu_cub
+
+                else:
+                    print(pre + ': Data not in 3D - ' + cfile + ' Ext [{0:d}]'.format(i_ext))
+
+
+
+            # Write
+            if reverse:
+                # get 3D file name
+                if mask:
+                    ofil = tfil.replace('_2d.mask.fits', '_3d.mask.fits')
+                else:
+                    ofil = tfil.replace('_2d.fits', '_3d.fits')
+            else:
+                # get 2d file name
+                ofil = cfile.replace('.fits', '_2d.fits')
+
+
+            hdl_cub.writeto(ofil, overwrite=True)
+
+    return
+
+
+def kcwi_make_2d_mask(fn, mask=None, cubed=False):
+    import pyds9,time
+    if cubed:
+        suffix="cubed"
+    else:
+        suffix="cubes"
+
+    regfn = fn.split('.')[0]+'_i'+suffix+'_2d.reg'
+    cubefn=regfn.replace('_2d.reg','.fits')
+    imgfn=regfn.replace('reg','fits')
+
+    if mask == None:
+        if not os.path.exists(regfn):
+            kcwi_flatten_cube(cubefn)
+
+            d = pyds9.DS9(f"{regfn.replace('.reg', '')}")
+            d.set(f"file {imgfn}")
+            d.set('height 1200')
+            d.set('width 2000')
+            d.set('zscale')
+            d.set('mode region')
+            d.set('smooth function boxcar')
+            d.set('smooth radius 3')
+            d.set('smooth yes')
+            d.set('regions system physical')
+            d.set(f"regions save {regfn}")
+            d.set('regions shape box')
+            d.set('zoom to fit')
+
+            # os.system(f"ds9 {fn.split('.')[0]+'_i'+suffix+'_whitelight.fits'} -regions save {fn.split('.')[0]+'_i'+suffix+'_mask.reg'} -title whitelight_mask -height 1200 -width 800 -zscale -mode region -regions shape ellipse -zoom to fit -regions system physical &")
+
+            mask_orig_size = os.path.getsize(regfn)
+
+            while os.path.getsize(regfn) == mask_orig_size:
+                time.sleep(1)
+
+        # convert to *_mask2d.fits
+        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_2d.mask.fits'):
+            kcwi_reg_fits(imgfn, regfn, regfn.replace("reg", "mask.fits"))
+
+
+        if not os.path.exists(fn.split('.')[0]+'_i'+suffix+'_3d.mask.fits'):
+            kcwi_flatten_cube(cubefn, reverse = True, mask = True)
+
+            cont = fits.open(fn.split('.')[0]+'_i'+suffix+'_mask3d.cont.fits')[0]
+            mask = fits.open(fn.split('.')[0]+'_i'+suffix+'_3d.mask.fits')[0]
+
+            comb_mask = cont.copy()
+
+            comb_mask.data = cont.data + mask.data
+            comb_mask.data[comb_mask.data == 2] = 1
+
+            comb_mask.writeto(fn.split('.')[0]+'_i'+suffix+'_mask3d.fits')
 
     else:
         print('External Mask Incorporation to be developed soon!')

@@ -37,7 +37,7 @@ def main(listfile, noplot=False):
         from bokeh.layouts import column
         from bokeh.models import Range1d
         from bokeh.models import Span
-        from bokeh.io import export_svg
+        # from bokeh.io import export_svg
         from bokeh.io import export_png
 
 

@@ -1,0 +1,91 @@
+#!/bin/zsh
+# usage: complete KCWI reduction
+# supply regions files
+# needs to be in the same directory as raw data! -- update this!
+
+echo "Hello!"
+echo "Welcome to the CAREFUL version of the KCWI python DRP!"
+echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
+echo ""
+echo "Stage 1"
+
+obj=({47..63}) #science target file numbers
+std=({{37..39},{67..69}}) #standard star file numbers
+all=("${obj[@]}" "${std[@]}") #union of obj and std
+
+# echo {${obj[1]}..${obj[2]}}
+#conda activate kcwidrp
+
+set -e #make sure we don't proceed if not in kcwidrp environment
+
+
+reduce_kcwi -f kb*.fits -g -st 1
+echo "Stage 1 is Done!"
+
+# make *_smsk.fits files
+for i in $all
+do
+	python ~/Software/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py redux/kb*_000${i}_intf.fits redux/kb*_000$i.reg;
+done
+
+mkdir redux/stage5_nomask
+mv redux/*intk.fits redux/*sky.fits redux/stage5_nomask
+
+sed -i '' '/sky/d' kcwi.proc #remove sky
+sed -i '' '/intk/d' kcwi.proc #remove intk
+
+#make kcwi.sky file
+for i in $all
+do
+	echo kb*_000${i}.fits kb*_000${i}.fits redux/kb*_000${i}_smsk.fits
+done >> kcwi.sky
+
+echo "Stage 2"
+reduce_kcwi -f kb*.fits -g -st 2
+echo "Stage 2 is Done!"
+
+python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/kb*_000${^obj}_icube.fits #make *_icube_2d.fits files
+python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/kb*_000${^all}_icube.fits #make *_icube.thum.fits files
+
+python ~/Software/kcwi/pro/kcwi_makemask_medfilter_nik.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
+
+#make a backup of *icube.fits files
+mkdir redux/pre_med_filt
+cp redux/*icube.fits redux/pre_med_filt
+
+python ~/Software/kcwi/pyDRP/kcwi_medfilter.py redux/kb*_000${^all}_icube.fits #median filter
+
+# remove SKY and OBJECT from kcwi.proc
+sed -i '' '/OBJECT/d' kcwi.proc
+sed -i '' '/SKY/d' kcwi.proc
+
+echo "Stage 3"
+reduce_kcwi -f kb*.fits -g -st 3
+echo "Stage 3 is Done!"
+
+mkdir fluxcal
+cd fluxcal
+ls ../redux/*invsens* | column -c 1 >> med_bl.list
+
+python ~/Software/kcwi/pyDRP/kcwi_combinestd.py med_bl.list
+cp med_bl_invsens.fits ../redux #this should be fixed?
+cd ../ #perhaps there's a better way to do this
+
+#clean proc table
+sed -i '' '/ea/d' kcwi.proc
+sed -i '' '/icubes/d' kcwi.proc
+
+for i in $std
+do
+	sed -i '' "s/kb[^|]*_000${i}.fits/        med_bl.fits/g" kcwi.proc
+done
+
+mkdir redux/pre_std_star_stack
+cp redux/*icubes.fits redux/pre_std_star_stack
+
+echo "Stage 4"
+reduce_kcwi -f kb*.fits -g -st 3
+echo "Stage 4 is Done!"
+
+echo "First Part of Reduction Complete"
+echo "Now onto stacking??"
