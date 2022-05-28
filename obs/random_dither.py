@@ -9,9 +9,9 @@ def parser_init():
 
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('--xsig', dest='xsig',
-            type=int, default=4, help='pixel sigma in x direction')
+            type=float, default=4, help='pixel sigma in x direction')
     parser.add_argument('--ysig', dest='ysig', 
-            type=int, default=5, help='pixel sigma in y direction')
+            type=float, default=5, help='pixel sigma in y direction')
     parser.add_argument('--npoint', dest='npoint', 
             type=int, default=1, help='number of pointings')
 
