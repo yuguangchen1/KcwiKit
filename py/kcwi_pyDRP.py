@@ -372,7 +372,7 @@ def kcwi_vachelio(hdu,hdr_ref='',mask=False,uncert=False,flags=False,method='hel
         # print('mask=True')
     elif uncert==True:
         hdu = hdu['UNCERT']
-        hdu.data **= 2 #python DRP generate sigma cube rather than variance cube
+        hdu.data **= 2 #python DRP generates sigma cube rather than variance cube
         # print('uncert=True')
     elif flags == True:
         hdu = hdu['FLAGS']
@@ -619,7 +619,7 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,stepsig=0,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, n_pix_trim = 2):
+               use_regmask=True, low_mem=False, n_pix_trim = 3):
 #   fnlist="q0100-bx172.list"
 #   shiftlist=""
 #   preshiftfn=""
@@ -881,7 +881,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
 
-            hdu_i.data[(hdu_f.data != 0) & (hdu_m.data == 1)] = np.nan
+            hdu_i.data[(hdu_f.data != 0) | (hdu_m.data != 0)] = np.nan
 
             # have to use surface brightness for now, mProjectCube has bug with brightness units combined with drizzle scale
             dx=np.sqrt(hdu_i.header['CD1_1']**2+hdu_i.header['CD2_1']**2)*3600.
@@ -963,15 +963,15 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 flagimg=hdu_f.data[kk,:,:]
 
 
-                flag_dim = mask.shape
+                flag_dim = flagimg.shape
                 # set edge pixels = 128
-                # n_pix = n_pix_trim # nominally 4 pix, really only need 1
-                # flagimg[0:n_pix,:] = 128
-                # flagimg[:,0:n_pix] = 128
-                # flagimg[flag_dim[0]-n_pix:flag_dim[0],:] = 128
-                # flagimg[:,flag_dim[1]-n_pix:flag_dim[1]] = 128
+                n_pix = n_pix_trim # nominally 4 pix, really only need 1
+                flagimg[0:n_pix,:] = 128
+                flagimg[:,0:n_pix] = 128
+                flagimg[flag_dim[0]-n_pix:flag_dim[0],:] = 128
+                flagimg[:,flag_dim[1]-n_pix:flag_dim[1]] = 128
 
-                index_y,index_x=np.where(mask==1)
+                index_y,index_x=np.where(flagimg == 0)
                 if len(index_y)==0:
                     continue
                 xrange=[index_x.min(),index_x.max()]
@@ -1533,19 +1533,19 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         # trim
 
         # need a mask for pyDRP
-        mask=fits.open(fn[i])['MASK']
-        # mask_dim = mask.shape
+        mask=fits.open(fn[i])['FLAGS']
+        mask_dim = mask.shape
         # set edge pixels = 128
-        # n_pix = n_pix_trim # nominally 4 pix, really only need 1
-        # mask.data[:,0:n_pix,:] = 128
-        # mask.data[:,:,0:n_pix] = 128
-        # mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
-        # mask.data[:,:,mask_dim[2]-n_pix:mask_dim[2]] = 128
+        n_pix = n_pix_trim # nominally 4 pix, really only need 1
+        mask.data[:,0:n_pix,:] = 128
+        mask.data[:,:,0:n_pix] = 128
+        mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
+        mask.data[:,:,mask_dim[2]-n_pix:mask_dim[2]] = 128
 
         twod_mask = np.nanmedian(mask.data[qwave,:,:], axis = 0).T # don't really need [qwave,:,:]
         # thum[mask==0] = np.nan
 
-        index_x,index_y=np.where(twod_mask==1)
+        index_x,index_y=np.where(twod_mask==0)
         # print(index_x, index_y)
         xrange=[index_x.min(),index_x.max()]
         yrange=[index_y.min(),index_y.max()]

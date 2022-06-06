@@ -201,38 +201,14 @@ def kcwi_medfilter_actonone(args, par):
 
         # padded
         flagcube[cube == 0] = 1
-        # cube[cube==0] = np.nan
-        # cube[(fcube != 0) & (mcube == 1)] = 0
+        cube[cube==0] = np.nan
 
         # masking
-        #cube[mcube != 0] = np.nan;
-        flagcube[mcube != 0] = -100
-        # cube[fcube != 0] = np.nan;
-        # flagcube[(fcube != 0) & (mcube == 1)] = -100
-
-        flagcube[fcube != 0] = -100
+        cube[mcube != 0] = np.nan; flagcube[mcube != 0] = -100
+        cube[fcube != 0] = np.nan; flagcube[fcube != 0] = -100
 
         # temp fix for out-of-FoV
-        # flagcube[mcube == 0] = 1
-
-        # # temp fix of flag ripple
-        # for kk in range(shape[0]):
-        #     # determine good data range in y direction
-        #     goodrange_y, goodrange_x = np.where(flagcube[kk, :, :] == 0)
-        #     if len(goodrange_y)!=0:
-        #         yrange = (np.min(goodrange_y), np.max(goodrange_y))
-        #         for ii in range(shape[2]):
-        #             index = (flagcube[kk, :, ii] == -100)
-        #             # almost the entire vertical line is flagged?
-        #             if np.sum(index) >= yrange[1] - yrange[0] - 3:
-        #                 flagcube[kk, index, ii] = 0
-
-        cube[flagcube != 0] = np.nan
-        cube0[(fcube != 0) & (mcube == 1)] = np.nan
-        # hdu_tmp = fits.PrimaryHDU(flagcube)
-        # hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
-        #
-        # fits.PrimaryHDU(cube).writeto('tmp_cube.fits', overwrite=True)
+        flagcube[fcube > 100] = 1
 
         # emission line mask
         if mimg2 is not None:
@@ -253,7 +229,7 @@ def kcwi_medfilter_actonone(args, par):
         if np.sum(qq) != 0:
             for kk in range(shape[0]):
                 cube[kk][qq & (flagcube[kk, :, :]!=1)] = np.nan
-                flagcube[kk][qq & (flagcube[kk, :, :]!=1)] = - 100
+                flagcube[kk][qq & (flagcube[kk, :, :]!=1)] = -100
 
         # 2nd pass mask
         if mstack is not None:
@@ -261,18 +237,18 @@ def kcwi_medfilter_actonone(args, par):
             # masked pixels
             index = (mstack == 1)
             cube[index & (flagcube != 1)] = np.nan
-            flagcube[index & (flagcube != 1)] = -200 #-100
+            flagcube[index & (flagcube != 1)] = -100
 
-        #     # out of FoV pixels
-        #     index = ~np.isfinite(mstack)
-        #     cube[index & (flagcube != 1)] = np.nan
-        #     flagcube[index & (flagcube != 1)] = -200
-        #
-        # # temp fix the edges in flag cubes after DAR
-        # flagcube[:, 0, :] = 1
-        # flagcube[:, -1, :] = 1
-        # flagcube[:, :, 0] = 1
-        # flagcube[:, :, -1] = 1
+            # out of FoV pixels
+            index = ~np.isfinite(mstack)
+            cube[index & (flagcube != 1)] = np.nan
+            flagcube[index & (flagcube != 1)] = -200
+
+            # temp fix the edges in flag cubes after DAR
+            flagcube[:, 0, :] = 1
+            flagcube[:, -1, :] = 1
+            flagcube[:, :, 0] = 1
+            flagcube[:, :, -1] = 1
 
 
         # trim
@@ -330,16 +306,16 @@ def kcwi_medfilter_actonone(args, par):
                     medcube[kk, jj, ii] = np.nanmedian(cube[zrange[0]:zrange[1], yrange[0]:yrange[1], ii])
 
         # interpolate bad data
-
+        """
         hdu_tmp = fits.PrimaryHDU(medcube)
         hdu_tmp.writeto('tmp.fits', overwrite=True)
         hdu_tmp = fits.PrimaryHDU(flagcube)
         hdu_tmp.writeto('tmp_flag.fits', overwrite=True)
-        """
+
         medcube = fits.open('tmp.fits')[0].data
         flagcube = fits.open('tmp_flag.fits')[0].data
         """
-        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube0.fits', overwrite=True)
+
         # interpolate along the slices
         for ii in range(shape[2]):
             for kk in range(shape[0]):
@@ -431,7 +407,7 @@ def kcwi_medfilter_actonone(args, par):
                                 bounds_error=False, fill_value='extrapolate')
                         tmpmed[qlin3] = li(qlin3)
 
-        fits.PrimaryHDU(flagcube).writeto('tmp_flagcube.fits', overwrite=True)
+
         # recover padding
         medcube[flagcube==1] = 0
 

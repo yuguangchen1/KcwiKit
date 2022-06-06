@@ -6,12 +6,19 @@
 echo "Hello!"
 echo "Welcome to the CAREFUL version of the KCWI python DRP!"
 echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
+
+dir=/Volumes/Data/Documents/Chuck/KCWI_DRP/pyDRP/gws-MM37_order-2
+cd $dir
+
+echo "We are in $dir"
+
 echo ""
 echo "Stage 1"
 
 obj=({47..63}) #science target file numbers
 std=({{37..39},{67..69}}) #standard star file numbers
 all=("${obj[@]}" "${std[@]}") #union of obj and std
+
 
 # echo {${obj[1]}..${obj[2]}}
 #conda activate kcwidrp
