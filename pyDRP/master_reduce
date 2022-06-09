@@ -7,18 +7,58 @@ echo "Hello!"
 echo "Welcome to the CAREFUL version of the KCWI python DRP!"
 echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
 
-dir=/Volumes/Data/Documents/Chuck/KCWI_DRP/pyDRP/gws-MM37_order-2
+
+
+while getopts d:ho:s: optval
+do
+   case $optval in
+		 h) HELP=1;;
+		 d) dir="$OPTARG";;
+		 # st) STAGE="$OPTARG";;
+		 o) obj=(); while IFS= read -r line; do obj+=("$line"); done <$OPTARG;;
+		 # s) std+=({$OPTARG});;
+		 *) echo "master_reduce -h for help"; exit -1;;
+   esac
+done
+# shift $((OPTIND-1));
+
+if [ $HELP ]; then
+	echo "master_reduce -d RAW_DIR -o OBJECTS -s STDS [-h]"
+	echo "KCWI python DRP + extra intermediate steps"
+	echo "-d RAW_DIR  directory with raw data"
+	# echo "-st STAGE   which stage of the reduction to do?"
+	echo "-o OBJECTS  list of science objects e.g. 43..54"
+	echo "-s STDS     list of standard stars e.g. 54..59"
+	echo "-h .......  help (display)"
+	exit -1
+fi
+
+# Example: ~/Software/kcwi/pyDRP/master_reduce -d /Volumes/Data/Documents/Chuck/Observing/2022may28 -o 071..092 -s 061..070 -s 093..101
+
+
+
+
+
+
+# dir=/Volumes/Data/Documents/Chuck/KCWI_DRP/pyDRP/q0933-MD75_bash_test-2/
 cd $dir
 
 echo "We are in $dir"
+echo ""
+
+# echo ""
+# echo "Stage 1"
+
+echo "Science Objects: $obj"
+# echo "Standard Stars: $std"
+
+# obj=({53..71}) #science target file numbers
+# std=({72..74}) #standard star file numbers
+# all=("${obj[@]}" "${std[@]}") #union of obj and std
+# echo "All Objects: $all"
 
 echo ""
 echo "Stage 1"
-
-obj=({47..63}) #science target file numbers
-std=({{37..39},{67..69}}) #standard star file numbers
-all=("${obj[@]}" "${std[@]}") #union of obj and std
-
 
 # echo {${obj[1]}..${obj[2]}}
 #conda activate kcwidrp
@@ -30,9 +70,9 @@ reduce_kcwi -f kb*.fits -g -st 1
 echo "Stage 1 is Done!"
 
 # make *_smsk.fits files
-for i in $all
+for i in $obj
 do
-	python ~/Software/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py redux/kb*_000${i}_intf.fits redux/kb*_000$i.reg;
+	python ~/Software/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py redux/${i}_intf.fits redux/$i.reg;
 done
 
 mkdir redux/stage5_nomask
@@ -42,17 +82,21 @@ sed -i '' '/sky/d' kcwi.proc #remove sky
 sed -i '' '/intk/d' kcwi.proc #remove intk
 
 #make kcwi.sky file
-for i in $all
+for i in $obj
 do
-	echo kb*_000${i}.fits kb*_000${i}.fits redux/kb*_000${i}_smsk.fits
+	echo ${i}.fits ${i}.fits redux/${i}_smsk.fits
 done >> kcwi.sky
 
 echo "Stage 2"
 reduce_kcwi -f kb*.fits -g -st 2
 echo "Stage 2 is Done!"
 
-python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/kb*_000${^obj}_icube.fits #make *_icube_2d.fits files
-python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/kb*_000${^all}_icube.fits #make *_icube.thum.fits files
+#note fitsheader needs astropy!
+
+all=($(fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'))
+
+python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
+python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
 
 python ~/Software/kcwi/pro/kcwi_makemask_medfilter_nik.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
 
@@ -60,7 +104,7 @@ python ~/Software/kcwi/pro/kcwi_makemask_medfilter_nik.py redux #make *_icube_2d
 mkdir redux/pre_med_filt
 cp redux/*icube.fits redux/pre_med_filt
 
-python ~/Software/kcwi/pyDRP/kcwi_medfilter.py redux/kb*_000${^all}_icube.fits #median filter
+python ~/Software/kcwi/pyDRP/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
 
 # remove SKY and OBJECT from kcwi.proc
 sed -i '' '/OBJECT/d' kcwi.proc
@@ -72,7 +116,9 @@ echo "Stage 3 is Done!"
 
 mkdir fluxcal
 cd fluxcal
-ls ../redux/*invsens* | column -c 1 >> med_bl.list
+ls ../redux/*invsens*fits | column -c 1 >> med_bl.list
+
+std=($(ls ../redux/*invsens*fits | xargs -n 1 basename | sed 's/_invsens.*//'))
 
 python ~/Software/kcwi/pyDRP/kcwi_combinestd.py med_bl.list
 cp med_bl_invsens.fits ../redux #this should be fixed?
@@ -84,7 +130,7 @@ sed -i '' '/icubes/d' kcwi.proc
 
 for i in $std
 do
-	sed -i '' "s/kb[^|]*_000${i}.fits/        med_bl.fits/g" kcwi.proc
+	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwi.proc
 done
 
 mkdir redux/pre_std_star_stack
