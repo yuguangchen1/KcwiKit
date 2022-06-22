@@ -1544,17 +1544,17 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
         twod_mask = np.nanmedian(mask.data[qwave,:,:], axis = 0).T # don't really need [qwave,:,:]
         # thum[mask==0] = np.nan
-
         index_x,index_y=np.where(twod_mask==0)
         # print(index_x, index_y)
         xrange=[index_x.min(),index_x.max()]
         yrange=[index_y.min(),index_y.max()]
+
         thum[:,yrange[1]-trim[1,i]+1:]=np.nan
         thum[:,:yrange[0]+trim[0,i]]=np.nan
         thum[:xrange[0],:]=np.nan
         thum[xrange[1]:,:]=np.nan
-        #thum=np.nan_to_num(thum)
 
+        #thum=np.nan_to_num(thum)
         # preshift
         if preshiftfn!='':
             index=np.where(np.array(prefn)==os.path.basename(fn[i]))
