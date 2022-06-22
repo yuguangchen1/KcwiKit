@@ -6,12 +6,12 @@
 echo "Hello! 😎"
 echo "Welcome to the CAREFUL version of the KCWI python DRP!"
 echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
-echo "Please specify RAW_DIR (-d) and obj.txt file (-o)"
+echo "Please specify an obj.txt file (-o)"
 
 set -e #make sure we don't proceed if not in kcwidrp environment
 
 
-while getopts d:ho:s: optval
+while getopts d:ho:s:c: optval
 do
    case $optval in
 		 h) HELP=1;;
@@ -20,27 +20,38 @@ do
 		 o) obj=(); while IFS= read -r line; do obj+=("$line"); done <$OPTARG;;
 		 s) IFS=, # split on (tres) commas
 		    stages=($OPTARG);;
+     c) cfg="$OPTARG";;
 		 *) echo "master_reduce -h for help"; exit -1;;
    esac
 done
 # shift $((OPTIND-1));
 
 if [ $HELP ]; then
+  echo ""
 	echo "master_reduce -d RAW_DIR -o obj.txt  -s stage1drp,stage1plus,... [-h]"
 	echo "KCWI python DRP + extra intermediate steps"
-	echo "-d RAW_DIR  directory with raw data"
+	echo "-d RAW_DIR  directory with raw data (assumed to be current working directory)"
 	# echo "-st STAGE   which stage of the reduction to do?"
 	echo "-o obj.txt  name of text file in RAW_DIR with list of science objects e.g. \nkb181110_00061 \nkb181110_00062 \n.\n.\n."
 	echo "-s STAGES   list of stages to run (default: main) e.g. \nstage1drp,stage1plus,stage2drp \nor \nstage1plusToEnd"
-	echo "-h .......  help (display)"
+  echo "-c kcwi.cfg alternate configuration file (assumed to be in RAW_DIR)"
+  echo "-h .......  help (display)"
+  echo ""
+  echo "Sample Call: ~/Software/kcwi/pyDRP/master_reduce -o sci.txt"
 	exit -1
 fi
 
 
 stage1drp () {
   echo ""
-  echo "Stage 1"
-  reduce_kcwi -f kb*.fits -g -st 1
+  if [ $cfg ]
+  then
+    echo "Stage 1 (using $cfg)"
+    reduce_kcwi -f kb*.fits -g -st 1 -c $cfg
+  else
+    echo "Stage 1"
+    reduce_kcwi -f kb*.fits -g -st 1
+  fi
   echo "Stage 1 is Done!"
 }
 
@@ -65,8 +76,14 @@ stage1plus () {
 }
 
 stage2drp () {
-  echo "Stage 2"
-  reduce_kcwi -f kb*.fits -g -st 2
+  if [ $cfg ]
+  then
+    echo "Stage 2 (using $cfg)"
+    reduce_kcwi -f kb*.fits -g -st 2 -c $cfg
+  else
+    echo "Stage 2"
+    reduce_kcwi -f kb*.fits -g -st 2
+  fi
   echo "Stage 2 is Done!"
 }
 
@@ -94,9 +111,16 @@ stage2plus () {
 
 
 stage3drp () {
-  echo "Stage 3"
-  echo "Note this stage will require some human intervention..."
-  reduce_kcwi -f kb*.fits -g -st 3
+  if [ $cfg ]
+  then
+    echo "Stage 3 (using $cfg)"
+    echo "Note this stage will require some human intervention..."
+    reduce_kcwi -f kb*.fits -g -st 3 -c $cfg
+  else
+    echo "Stage 3"
+    echo "Note this stage will require some human intervention..."
+    reduce_kcwi -f kb*.fits -g -st 3
+  fi
   echo "Stage 3 is Done!"
 }
 
@@ -125,8 +149,14 @@ stage3plus () {
 }
 
 stage4drp () {
-  echo "Stage 4"
-  reduce_kcwi -f kb*.fits -g -st 3
+  if [ $cfg ]
+  then
+    echo "Stage 4 (using $cfg)"
+    reduce_kcwi -f kb*.fits -g -st 3 -c $cfg
+  else
+    echo "Stage 4"
+    reduce_kcwi -f kb*.fits -g -st 3
+  fi
   echo "Stage 4 is Done!"
   echo "First Part of Reduction Complete"
   echo "Now onto stacking??"
@@ -162,7 +192,11 @@ stage1plusToEnd () {
 ### Beginning of Program ###
 
 # dir=/Volumes/Data/Documents/Chuck/KCWI_DRP/pyDRP/q0933-MD75_bash_test-2/
-cd $dir
+if [ $dir ]; then
+  cd $dir
+else
+  dir=`pwd`
+fi
 echo ""
 echo "We are in $dir"
 echo ""
