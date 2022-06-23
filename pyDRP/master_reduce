@@ -94,9 +94,8 @@ stage2prereg () {
   IFS=$'\n'
   all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
   IFS=$SAVEIFS
-  # declare -p obj
-  # declare -p all
-  # python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
+
+  python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
   python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
 }
 
