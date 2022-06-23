@@ -54,7 +54,7 @@ stage1drp () {
   fi
   echo "Stage 1 is Done!"
 }
-
+# make .reg files
 stage1plus () {
   # make *_smsk.fits files
   for i in $obj
@@ -88,14 +88,21 @@ stage2drp () {
 }
 
 
-stage2plus () {
+stage2prereg () {
   #note fitsheader needs astropy!
-
-  all=($(fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'))
-
-  python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
+  SAVEIFS=$IFS
+  IFS=$'\n'
+  all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
+  IFS=$SAVEIFS
+  # declare -p obj
+  # declare -p all
+  # python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
   python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
+}
 
+# make *.icube_2d.reg and *_icube.thum.reg files
+
+stage2postreg () {
   python ~/Software/kcwi/pro/kcwi_makemask_medfilter_nik.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
 
   #make a backup of *icube.fits files
@@ -168,7 +175,8 @@ main () {
 	stage1plus
 
 	stage2drp
-	stage2plus
+	stage2prereg
+  stage2postreg
 
 	stage3drp
 	stage3plus
@@ -181,7 +189,25 @@ stage1plusToEnd () {
 	stage1plus
 
 	stage2drp
-	stage2plus
+  stage2prereg
+  stage2postreg
+
+	stage3drp
+	stage3plus
+
+	stage4drp
+}
+
+stage1plusToStage2pre () {
+	stage1plus
+
+	stage2drp
+  stage2prereg
+}
+
+
+stage2postregToEnd () {
+  stage2postreg
 
 	stage3drp
 	stage3plus
