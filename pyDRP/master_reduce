@@ -41,6 +41,7 @@ if [ $HELP ]; then
 	exit -1
 fi
 
+# IFS=$'\n' # for array construction later
 
 stage1drp () {
   echo ""
@@ -64,6 +65,8 @@ stage1plus () {
 
   mkdir -p redux/stage5_nomask
   mv redux/*intk.fits redux/*sky.fits redux/stage5_nomask
+
+  cp kcwi.proc kcwi_stage1plus.proc
 
   sed -i '' '/sky/d' kcwi.proc #remove sky
   sed -i '' '/intk/d' kcwi.proc #remove intk
@@ -90,10 +93,10 @@ stage2drp () {
 
 stage2prereg () {
   #note fitsheader needs astropy!
-  SAVEIFS=$IFS
+  # SAVEIFS=$IFS
   IFS=$'\n'
   all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
-  IFS=$SAVEIFS
+  # IFS=$SAVEIFS
 
   python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
   python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
@@ -106,10 +109,11 @@ stage2postreg () {
 
   #make a backup of *icube.fits files
   mkdir -p redux/pre_med_filt
-  cp redux/*icube.fits redux/pre_med_filt
+  cp -n redux/*icube.fits redux/pre_med_filt
 
   python ~/Software/kcwi/pyDRP/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
 
+  cp kcwi.proc kcwi_stage2postreg.proc
   # remove SKY and OBJECT from kcwi.proc
   sed -i '' '/OBJECT/d' kcwi.proc
   sed -i '' '/SKY/d' kcwi.proc
@@ -135,15 +139,17 @@ stage3plus () {
   cd fluxcal
   ls ../redux/*invsens*fits | column -c 1 >> med_bl.list
 
-  std=($(ls ../redux/*invsens*fits | xargs -n 1 basename | sed 's/_invsens.*//'))
+  IFS=$'\n'
+  std=($(ls ../redux/kb*invsens*fits | xargs -n 1 basename | sed 's/_invsens.*//'))
 
   python ~/Software/kcwi/pyDRP/kcwi_combinestd.py med_bl.list
-  cp med_bl_invsens.fits ../redux #this should be fixed?
+  cp -n med_bl_invsens.fits ../redux #this should be fixed? -n so no overwrite... need to include BM cfg, etc.
   cd ../ #perhaps there's a better way to do this
 
+  cp kcwi.proc kcwi_stage3plus.proc
   #clean proc table
-  sed -i '' '/ea/d' kcwi.proc
-  sed -i '' '/icubes/d' kcwi.proc
+  gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
+  gsed -i '/icubes/d' kcwi.proc
 
   for i in $std
   do
