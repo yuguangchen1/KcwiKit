@@ -149,6 +149,7 @@ stage3plus () {
   cp kcwi.proc kcwi_stage3plus.proc
   #clean proc table
   gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
+  gsed -i '/icubed/d' kcwi.proc # in case there were no std. stars
   gsed -i '/icubes/d' kcwi.proc
 
   for i in $std
