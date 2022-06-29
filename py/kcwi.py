@@ -531,8 +531,8 @@ def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='heliocentric'):
                     f_nex=interpolate.interp1d(wave_hel,spec,kind='next',bounds_error=False,fill_value=fill_value)
                     spec_nex=f_nex(wave_new)
 
-                    spec_new=np.zeros(shape_new[2])
-                    for k in range(shape_new[2]):
+                    spec_new=np.zeros(shape_new[0])
+                    for k in range(shape_new[0]):
                         spec_new[k]=max(spec_pre[k],spec_nex[k])
                 cube_new[:, j, i] = spec_new
 
@@ -1094,7 +1094,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
 
             # trim
-            for kk in range(hdr0['NAXIS3']):
+            for kk in range(hdu_i.header['NAXIS3']):
                 img=hdu_i.data[kk,:,:]
                 var=hdu_v.data[kk,:,:]
                 mask=hdu_m.data[kk,:,:]
