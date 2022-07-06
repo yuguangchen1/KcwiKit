@@ -90,11 +90,11 @@ stage1plus () {
 
   cp kcwi.proc kcwi_stage1plus.proc
 
-  if [ $machine == "MacOS" ]
+  if [ $machine = "MacOS" ]
   then
     sed -i '' '/sky/d' kcwi.proc #remove sky
     sed -i '' '/intk/d' kcwi.proc #remove intk
-  elif  [ $machine == "Linux" ]
+  elif  [ $machine = "Linux" ]
   then
     sed -i '/sky/d' kcwi.proc #remove sky
     sed -i '/intk/d' kcwi.proc #remove intk
@@ -148,11 +148,11 @@ stage2postreg () {
   cp kcwi.proc kcwi_stage2postreg.proc
 
   # remove SKY and OBJECT from kcwi.proc
-  if [ $machine == "MacOS" ]
+  if [ $machine = "MacOS" ]
   then
     sed -i '' '/OBJECT/d' kcwi.proc
     sed -i '' '/SKY/d' kcwi.proc
-  elif  [ $machine == "Linux" ]
+  elif  [ $machine = "Linux" ]
   then
     sed -i '/OBJECT/d' kcwi.proc
     sed -i '/SKY/d' kcwi.proc
@@ -184,19 +184,18 @@ stage3plus () {
   IFS=$'\n'
   std=($(ls ../redux/kb*invsens*fits | xargs -n 1 basename | sed 's/_invsens.*//'))
 
-  if [ ${#arr[@]} -eq 0 ]; then
+  if [ ${#std[@]} -eq 0 ]; then
     echo "No standard stars detected! Exiting..."
     exit
   fi
 
   python ${fileloc}/kcwi_combinestd.py med_bl.list
-  cp -n med_bl_invsens.fits ../redux #this should be fixed? -n so no overwrite... need to include BM cfg, etc.
+  cp -n med_bl_invsens.fits ../redux || true #this should be fixed? -n so no overwrite... need to include BM cfg, etc.
   cd ../ #perhaps there's a better way to do this
-
   cp kcwi.proc kcwi_stage3plus.proc
 
   #clean proc table
-  if [ $machine == "MacOS" ]
+  if [ $machine = "MacOS" ]
   then
     gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
     gsed -i '/icubed/d' kcwi.proc # in case there were no std. stars
@@ -207,7 +206,7 @@ stage3plus () {
     	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwi.proc
     done
 
-  elif  [ $machine == "Linux" ]
+  elif  [ $machine = "Linux" ]
   then
     sed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
     sed -i '/icubed/d' kcwi.proc # in case there were no std. stars
