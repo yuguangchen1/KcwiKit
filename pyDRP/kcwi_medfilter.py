@@ -379,10 +379,10 @@ def kcwi_medfilter_actonone(args, par):
 
                     # extrapolate with nearest neighbor
                     qlin0 = np.where(tmpflag == 0)[0]
+                    q12 = np.where( (tmpflag==-100) | (tmpflag==-200) )[0]
                     if len(qlin0) == 0:
                         # numbers from other wavelengths are interpolated as well.
                         # use nearest neighbor
-                        q12 = np.where( (tmpflag==-100) | (tmpflag==-200) )[0]
                         if len(q12) > 1:
                             nn = interp1d(q12, tmpmed[q12], kind='nearest',
                                     bounds_error=False, fill_value='extrapolate')

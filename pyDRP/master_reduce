@@ -1,9 +1,30 @@
 #!/bin/zsh
 # usage: complete KCWI reduction
-# supply regions files
-# needs to be in the same directory as raw data! -- update this!
+# if running straight through, supply regions files
+# if making regions files, run:
+#   stage1drp, then
+#   stage1plusToStage2pre, then
+#   stage2postregToEnd
 
+## DEPENDENCIES: zsh, astropy, gsed (Mac), python 3, emoji terminal support :-)
+## Assuming master_reduce is at /path/to/dir/kcwi/pyDRP/mater_reduce
+## i.e. kcwi directory structure is intact!
+
+# what machine are we running on?
+case "$(uname -s)" in
+    Linux*)     machine=Linux;;
+    Darwin*)    machine=MacOS;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
+
+file=`realpath "$0"` #where is the master_reduce file located?
+fileloc=`dirname "$file"`
+
+# Intro
 echo "Hello! 😎"
+echo "We are running on ${machine}"
+echo "master_reduce located in ${fileloc}"
+echo ""
 echo "Welcome to the CAREFUL version of the KCWI python DRP!"
 echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
 echo "Please specify an obj.txt file (-o)"
@@ -41,6 +62,7 @@ if [ $HELP ]; then
 	exit -1
 fi
 
+
 # IFS=$'\n' # for array construction later
 
 stage1drp () {
@@ -60,16 +82,25 @@ stage1plus () {
   # make *_smsk.fits files
   for i in $obj
   do
-  	python ~/Software/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py redux/${i}_intf.fits redux/$i.reg;
+  	python ${fileloc}/kcwi_masksky_ds9.py redux/${i}_intf.fits redux/$i.reg;
   done
 
   mkdir -p redux/stage5_nomask
-  mv redux/*intk.fits redux/*sky.fits redux/stage5_nomask
+  mv redux/*intk.fits redux/*sky.fits redux/stage5_nomask || true
 
   cp kcwi.proc kcwi_stage1plus.proc
 
-  sed -i '' '/sky/d' kcwi.proc #remove sky
-  sed -i '' '/intk/d' kcwi.proc #remove intk
+  if [ $machine == "MacOS" ]
+  then
+    sed -i '' '/sky/d' kcwi.proc #remove sky
+    sed -i '' '/intk/d' kcwi.proc #remove intk
+  elif  [ $machine == "Linux" ]
+  then
+    sed -i '/sky/d' kcwi.proc #remove sky
+    sed -i '/intk/d' kcwi.proc #remove intk
+  else
+    echo "OS not recognized, can't edit kcwi.proc"
+  fi
 
   #make kcwi.sky file
   for i in $obj
@@ -98,25 +129,36 @@ stage2prereg () {
   all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
   # IFS=$SAVEIFS
 
-  python ~/Software/kcwi/pyDRP/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
-  python ~/Software/kcwi/pyDRP/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
+  python ${fileloc}/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
+  python ${fileloc}/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
 }
 
 # make *.icube_2d.reg and *_icube.thum.reg files
 
 stage2postreg () {
-  python ~/Software/kcwi/pro/kcwi_makemask_medfilter_nik.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
-
+  python ${fileloc}/kcwi_makemask_medfilter.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
   #make a backup of *icube.fits files
   mkdir -p redux/pre_med_filt
-  cp -n redux/*icube.fits redux/pre_med_filt
+  cp redux/*icube.fits redux/pre_med_filt
 
-  python ~/Software/kcwi/pyDRP/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
+  IFS=$'\n'
+  all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
+  python ${fileloc}/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
 
   cp kcwi.proc kcwi_stage2postreg.proc
+
   # remove SKY and OBJECT from kcwi.proc
-  sed -i '' '/OBJECT/d' kcwi.proc
-  sed -i '' '/SKY/d' kcwi.proc
+  if [ $machine == "MacOS" ]
+  then
+    sed -i '' '/OBJECT/d' kcwi.proc
+    sed -i '' '/SKY/d' kcwi.proc
+  elif  [ $machine == "Linux" ]
+  then
+    sed -i '/OBJECT/d' kcwi.proc
+    sed -i '/SKY/d' kcwi.proc
+  else
+    echo "OS not recognized, can't edit kcwi.proc"
+  fi
 }
 
 
@@ -137,25 +179,48 @@ stage3drp () {
 stage3plus () {
   mkdir -p fluxcal
   cd fluxcal
-  ls ../redux/*invsens*fits | column -c 1 >> med_bl.list
+  ls ../redux/kb*invsens*fits | column -c 1 >> med_bl.list
 
   IFS=$'\n'
   std=($(ls ../redux/kb*invsens*fits | xargs -n 1 basename | sed 's/_invsens.*//'))
 
-  python ~/Software/kcwi/pyDRP/kcwi_combinestd.py med_bl.list
+  if [ ${#arr[@]} -eq 0 ]; then
+    echo "No standard stars detected! Exiting..."
+    exit
+  fi
+
+  python ${fileloc}/kcwi_combinestd.py med_bl.list
   cp -n med_bl_invsens.fits ../redux #this should be fixed? -n so no overwrite... need to include BM cfg, etc.
   cd ../ #perhaps there's a better way to do this
 
   cp kcwi.proc kcwi_stage3plus.proc
-  #clean proc table
-  gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
-  gsed -i '/icubed/d' kcwi.proc # in case there were no std. stars
-  gsed -i '/icubes/d' kcwi.proc
 
-  for i in $std
-  do
-  	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwi.proc
-  done
+  #clean proc table
+  if [ $machine == "MacOS" ]
+  then
+    gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
+    gsed -i '/icubed/d' kcwi.proc # in case there were no std. stars
+    gsed -i '/icubes/d' kcwi.proc
+
+    for i in $std
+    do
+    	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwi.proc
+    done
+
+  elif  [ $machine == "Linux" ]
+  then
+    sed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
+    sed -i '/icubed/d' kcwi.proc # in case there were no std. stars
+    sed -i '/icubes/d' kcwi.proc
+
+    for i in $std
+    do
+    	sed -i "s/${i}.fits/        med_bl.fits/g" kcwi.proc
+    done
+
+  else
+    echo "OS not recognized, can't edit kcwi.proc"
+  fi
 
   mkdir -p redux/pre_std_star_stack
   cp redux/*icubes.fits redux/pre_std_star_stack
