@@ -1,4 +1,5 @@
 #!/bin/zsh
+
 # usage: complete KCWI reduction
 # if running straight through, supply regions files
 # if making regions files, run:
@@ -7,8 +8,12 @@
 #   stage2postregToEnd
 
 ## DEPENDENCIES: zsh, astropy, gsed (Mac), python 3, emoji terminal support :-)
+## Additional Dependencies (mostly for post-DRP): tqdm, colorcet, bokeh 2.0.0
+
 ## Assuming master_reduce is at /path/to/dir/kcwi/pyDRP/mater_reduce
 ## i.e. kcwi directory structure is intact!
+
+set -e #make sure we don't proceed if not in kcwidrp environment
 
 # what machine are we running on?
 case "$(uname -s)" in
@@ -17,7 +22,7 @@ case "$(uname -s)" in
     *)          machine="UNKNOWN:${unameOut}"
 esac
 
-file=`realpath "$0"` #where is the master_reduce file located?
+file=`readlink -f "$0"` #where is the master_reduce file located?
 fileloc=`dirname "$file"`
 
 # Intro
@@ -28,8 +33,6 @@ echo ""
 echo "Welcome to the CAREFUL version of the KCWI python DRP!"
 echo "Please make sure you have run 'conda activate kcwidrp' before proceeding"
 echo "Please specify an obj.txt file (-o)"
-
-set -e #make sure we don't proceed if not in kcwidrp environment
 
 
 while getopts d:ho:s:c: optval
