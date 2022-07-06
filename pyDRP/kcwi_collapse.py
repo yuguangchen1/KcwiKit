@@ -52,9 +52,16 @@ def main(file, wavebin=None, use_pix=False):
                 # read cube
                 cube = hdu.data
                 hdr = hdu.header
-                mask = hdl['MASK'].data
-                flag = hdl['FLAGS'].data
-                mask = mask | (flag != 0)
+                # idl or py?
+                if len(hdl) > 1:
+                    # PyDRP
+                    mask = hdl['MASK'].data
+                    flag = hdl['FLAGS'].data
+                    mask = mask | (flag != 0)
+                else:
+                    # idl
+                    mask = np.zeros_like(hdu.data)
+
 
                 # check if header contains WCS
                 if ('CRVAL3' not in hdr) and (i_ext==0):
