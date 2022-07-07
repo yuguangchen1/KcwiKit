@@ -7,6 +7,9 @@ Converting region files to sky masks. Same as kcwi_makemask.pro.
 import glob, os, sys
 import pdb
 
+import pathlib
+fileloc = str(pathlib.Path(__file__).parent.resolve())
+
 narg=len(sys.argv)
 if narg==1:
     dir='./'
@@ -20,12 +23,12 @@ for regfn in glob.glob(dir+"/*_icube.thum.reg"):
     #pdb.set_trace()
 
     imgfn=regfn.replace('.reg','.fits')
-    os.system("kcwi_masksky_ds9_thum.py "+imgfn+" "+regfn)
+    os.system(fileloc+"/kcwi_masksky_ds9_thum.py "+imgfn+" "+regfn)
 
 for regfn in glob.glob(dir+"/*_icube_2d.reg"):
     #pdb.set_trace()
 
     imgfn=regfn.replace('.reg','.fits')
-    os.system("kcwi_masksky_ds9_2d.py "+imgfn+" "+regfn)
+    os.system(fileloc+"/kcwi_masksky_ds9_2d.py "+imgfn+" "+regfn)
 
 print('Sky Masks Complete')
