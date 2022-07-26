@@ -743,12 +743,103 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
     return fluxtable
 
 
+def kcwi_check_samewave(hdr0, hdr1):
+    """
+    Check if the wavelength axes are the same in two headers.
+
+    Args:
+        hdr0 (astropy.io.fits.header) - input header #0
+        hdr1 (astropy.io.fits.header) - input header #1
+
+    Returns:
+        boolean: whether wave axes are the same
+    """
+
+    if hdr0['NAXIS3'] != hdr1['NAXIS3']:
+        # Not the same amount of pixels
+        return False
+
+    wave0 = (np.arange(hdr0['NAXIS3']) - hdr0['CRPIX3'] + 1) * hdr0['CD3_3'] + hdr0['CRVAL3']
+    wave1 = (np.arange(hdr1['NAXIS3']) - hdr1['CRPIX3'] + 1) * hdr1['CD3_3'] + hdr1['CRVAL3']
+
+    if not np.isclose(wave0[0], wave1[0]):
+        # Starting point different
+        return False
+    if not np.isclose(wave0[1] - wave0[0], wave1[1] - wave1[0]):
+        # delta w different
+        return False
+
+    return True
+
+def kcwi_resample_wave(hdu, newhdr, method='cubic'):
+    """
+    Resample a cube to match the wavelength direction to a different header.
+
+    Args: 
+        hdu (astropy HDU): input hdu
+        newhdr (astropy header): header containing the new wavelength grid
+        order (str): interpolation method or 'mask'
+
+    Returns: 
+        astropy.io.fits.PrimaryHDU: resampled data cube in the form of HDU
+    """
+
+    hdr = hdu.header
+    wave = (np.arange(hdr['NAXIS3']) - hdr['CRPIX3'] + 1) * hdr['CD3_3'] + hdr['CRVAL3']
+    data = hdu.data.copy()
+
+    newwave = (np.arange(newhdr['NAXIS3']) - newhdr['CRPIX3'] + 1) * newhdr['CD3_3'] + newhdr['CRVAL3']
+    newdata = np.zeros((len(newwave), hdu.shape[1], hdu.shape[2])) + np.nan
+
+    data = data.reshape(len(wave), -1)
+    newdata = newdata.reshape(len(newwave), -1)
+    for i in range(newdata.shape[1]):
+        spec = data[:, i]
+
+        if method != 'mask':
+            mask = ~np.isfinite(spec)
+            spec = np.nan_to_num(spec)
+            
+            # No good data, skip
+            if np.sum(spec)==0:
+                continue
+
+            ci = interpolate.interp1d(wave, spec, kind=method, bounds_error=False, fill_value=np.nan)
+            newspec = ci(newwave)
+
+            mi = interpolate.interp1d(wave, mask, kind='linear', bounds_error=False, fill_value=1)
+            newmask = mi(newwave)
+
+            newspec[newmask != 0] = np.nan
+
+        else:
+            # mask cube
+            mask = spec
+
+            mi = interpolate.interp1d(wave, mask, kind='linear', bounds_error=False, fill_value=128)
+            newmask = mi(newwave)
+
+            newspec = newmask
+
+        newdata[:, i] = newspec
+    
+    newdata = newdata.reshape((len(newwave), hdu.shape[1], hdu.shape[2]))
+    
+    newhdu = hdu.copy()
+    newhdu.header['NAXIS3'] = newhdr['NAXIS3']
+    newhdu.header['CRPIX3'] = newhdr['CRPIX3']
+    newhdu.header['CRVAL3'] = newhdr['CRVAL3']
+    newhdu.header['CD3_3'] = newhdr['CD3_3']
+    newhdu.data = newdata
+
+    return newhdu
+
 
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, montagepy=False):
+               use_regmask=True, low_mem=False, montagepy=False, wave_interp_method='cubic'):
     """
     Stacking the individual data cubes.
 
@@ -783,6 +874,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             small slicer.
         montagepy (bool): use MontagePy for drizzling? Otherwise, use the command
             line Montage installation. Both require proper installation.
+        wave_interp_method (str): interpolation method for wavelength direction. 
+            Only applies when spatial method is 'drizzle'.
 
     Returns:
         None
@@ -1008,13 +1101,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 mask_reg = region.get_mask(hdu=fits.PrimaryHDU(tmp,header=hdr2d))
 
                 hdu_i.data[:,mask_reg] = np.nan
-                hdu_v.data[:,mask_reg] = np.Inf
+                hdu_v.data[:,mask_reg] = np.nan
                 hdu_m.data[:,mask_reg] = 128
 
             # Infinity check
             q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
             hdu_i.data[q]=np.nan
-            hdu_v.data[q]=np.Inf
+            hdu_v.data[q]=np.nan
             hdu_m.data[q]=128
 
 
@@ -1121,8 +1214,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 img[yrange[1]-trim[1,i]+1:,:]=np.nan
                 img[:yrange[0]+trim[0,i],:]=np.nan
 
-                var[yrange[1]-trim[1,i]+1:,:]=np.Inf
-                var[:yrange[0]+trim[0,i],:]=np.Inf
+                var[yrange[1]-trim[1,i]+1:,:]=np.nan
+                var[:yrange[0]+trim[0,i],:]=np.nan
 
                 mask[yrange[1]-trim[1,i]+1:,:]=128
                 mask[:yrange[0]+trim[0,i],:]=128
@@ -1135,8 +1228,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     img[:,xrange[1]+1:]=np.nan # need to deal with vertical stripes along side
                     img[:,:xrange[0]]=np.nan
 
-                    var[:,xrange[1]+1:]=np.Inf
-                    var[:,:xrange[0]]=np.Inf
+                    var[:,xrange[1]+1:]=np.nan
+                    var[:,:xrange[0]]=np.nan
 
                     mask[:,xrange[1]+1:]=128
                     mask[:,:xrange[0]]=128
@@ -1152,6 +1245,18 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             # flux correction
             hdu_i.data = hdu_i.data * fluxnorm[i]
             hdu_v.data = hdu_v.data * fluxnorm[i]**2
+
+            # wavelength interpolation
+            if method=='drizzle':
+                # "reproject" package can handle wavelength interpolation, only
+                # Montage need this step.
+                if not kcwi_check_samewave(hdu_i.header, hdr0):
+                    print('  Different wavelength grid: interpolating...')
+
+                    hdu_i = kcwi_resample_wave(hdu_i, hdr0, method=wave_interp_method)
+                    hdu_v = kcwi_resample_wave(hdu_v, hdr0, method=wave_interp_method)
+                    hdu_m = kcwi_resample_wave(hdu_m, hdr0, method='mask')
+                    hdu_e = kcwi_resample_wave(hdu_e, hdr0, method='linear')
 
 
             # write
