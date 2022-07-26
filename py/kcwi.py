@@ -269,6 +269,24 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         par["stack_ad"]=np.array(ele[1:3]).astype(np.float)
         par["align_ad"]=np.array(ele[1:3]).astype(np.float)
 
+    q = np.where(np.array(keys)=='wave_ref')[0]
+    if len(q) > 0:
+        q = q[0]
+        ele = lins[q].split()
+        par['wave_ref'] = np.array(ele[1:3]).astype(np.float)
+
+    q = np.where(np.array(keys)=='nwave')[0]
+    if len(q) > 0:
+        q = q[0]
+        ele = lins[q].split()
+        par['nwave'] = int(ele[1])
+
+    q = np.where(np.array(keys)=='dwave')[0]
+    if len(q) > 0:
+        q = q[0]
+        ele = lins[q].split()
+        par['dwave'] = float(ele[1])
+
     q=np.where(np.array(keys)=='search_size')[0]
     if len(q)>0:
         q=q[0]
@@ -838,8 +856,9 @@ def kcwi_resample_wave(hdu, newhdr, method='cubic'):
 
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
+               wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, montagepy=False, wave_interp_method='cubic'):
+               use_regmask=True, low_mem=False, montagepy=False):
     """
     Stacking the individual data cubes.
 
@@ -861,6 +880,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         weights (list-like): weights of the individual cubes if using non-default.
         overwrite (bool): overwrite the cached files that was generated in
             previous runs?
+        wave_ref ([float, float]): [CRPIX3, CRVAL3] of the fianl wavelength grid. 
+            Will override the parfile.
+        dwave (float): CD3_3 of the final wavelength grid. Will override par file.
+        nawave (int): NAXIS3 of the final wavelength grid. Will override par file.
+        wave_interp_method (str): interpolation method for wavelength direction. 
+            Only applies when spatial method is 'drizzle'.
         keep_trim (bool): cache the trimmed data cubes?
         keep_mont (bool): cache the resampled data cubes?
         method (str): 'drizzle' (default), 'nearest-neighbor', 'bilinear',
@@ -874,8 +899,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             small slicer.
         montagepy (bool): use MontagePy for drizzling? Otherwise, use the command
             line Montage installation. Both require proper installation.
-        wave_interp_method (str): interpolation method for wavelength direction. 
-            Only applies when spatial method is 'drizzle'.
 
     Returns:
         None
@@ -931,6 +954,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         drizzle=par["drizzle"]
         if drizzle==0:
             drizzle=0.7
+    
+    if wave_ref[1]==0:
+        wave_ref = par['wave_ref']
+
+    if nwave==0:
+        nwave = par['nwave']
+
+    if dwave==0:
+        dwave = par['dwave']
+
 
     # make tmp directory
     if not os.path.exists('kcwi_stack'):
@@ -1010,7 +1043,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdr0['CD2_2']=pixscale_y
     hdr0['CD1_2']=0
     hdr0['CD2_1']=0
-    hdr0['CTYPE3']='WAVE'
+    #hdr0['CTYPE3']='WAVE'
     #hdr0['BUNIT']='10^(-16)erg/s/cm2/Angstrom'
     hdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
     if suffix!='cubes':
@@ -1026,8 +1059,17 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdr0['CD2_1']=pixscale_x*np.sin(np.deg2rad(orientation))
     hdr0['CD1_2']=pixscale_y*np.sin(np.deg2rad(orientation))
     hdr0['CD2_2']=pixscale_y*np.cos(np.deg2rad(orientation))
-    hdr0.totextfile(fnhdr,overwrite=1)
 
+    # wavelength
+    if wave_ref[1]!=0:
+        hdr0['CRPIX3'] = wave_ref[0]
+        hdr0['CRVAL3'] = wave_ref[1]
+    if nwave!=0:
+        hdr0['NAXIS3'] = int(nwave)
+    if dwave!=0:
+        hdr0['CD3_3'] = dwave
+
+    hdr0.totextfile(fnhdr,overwrite=1)
 
     # project
     #void=mProjectCube(fn[0],outfn[0],'kcwi_stack/tmp.hdr',drizzle=0.7,energyMode=True)
