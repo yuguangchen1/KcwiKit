@@ -134,7 +134,11 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         "med_y":0.,
         "med_z":0.,
         "background_subtraction":False,
-        "background_level":-1000}
+        "background_level":-1000,
+        "wave_ref":np.array([0., 0.]), 
+        "nwave":0,
+        "dwave":0.
+    }
 
     with open(parname,'r') as file:
         lins=file.readlines()
