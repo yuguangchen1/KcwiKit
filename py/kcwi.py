@@ -28,7 +28,7 @@ from fpdf import FPDF #fpdf2
 from tqdm import tqdm
 import pdb
 import time as ostime
-from specutils.utils import wcs_utils
+# from specutils.utils import wcs_utils
 import pathlib
 
 # MontagePy
@@ -424,6 +424,39 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     return par
 
 
+def a2v_conversion(wave):
+    """ Convert air-based wavelengths to vacuum
+
+    Adapted from wave.py in: https://github.com/pypeit/PypeIt/
+    Formula from https://ui.adsabs.harvard.edu/abs/1996ApOpt..35.1566C/
+    This is the Goddard IDL Air to Vacuum Conversion. Stolen from KCWI_DRP.
+
+    Parameters
+    ----------
+    wave: Quantity array
+        Wavelengths
+    Returns
+    -------
+    wave: Quantity array
+        Wavelength array corrected to vacuum wavelengths
+    """
+    # Convert to AA
+    wave = wave.to(u.AA)
+    wavelength = wave.value
+
+    # Standard conversion format
+    sigma_sq = (1.e4/wavelength)**2. #wavenumber squared
+    factor = 1 + (5.792105e-2/(238.0185-sigma_sq)) + (1.67918e-3/(57.362-sigma_sq))
+    factor = factor*(wavelength>=2000.) + 1.*(wavelength<2000.) #only modify above 2000A
+
+    # Convert
+    wavelength = wavelength*factor
+    # Units
+    new_wave = wavelength*u.AA
+    new_wave.to(wave.unit)
+
+    return new_wave
+
 # Perform air-to-vac, and barycentric correction in wavelength
 def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='heliocentric'):
     """
@@ -499,7 +532,8 @@ def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='heliocentric'):
     # air -> vac
     if flag_vac==False:
         # wave_vac=pyasl.airtovac2(wave_old) # PyAstronomy doesn't work on Mac M1 8/14/22?
-        wave_vac=wcs_utils.air_to_vac(wave_old*u.Angstrom).value
+        # wave_vac=wcs_utils.air_to_vac(wave_old*u.Angstrom).value # spec_utils, not using Goddard conversion
+        wave_vac=a2v_conversion(wave_old*u.AA).value # Goddard Conversion, matches KCWI_DRP
     else:
         wave_vac = wave_old.copy()
 
@@ -1417,7 +1451,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             #print(newcubem.shape)
             #print(newcubee.shape)
 
-    # CR Final Rejection
+    # CR Final Rejection, if needed
     if crr:
         crrfn=trimfn[i].replace('.trim.fits','.crr.fits')
         crrvfn=trimvfn[i].replace('.trim.fits','.crr.fits')
