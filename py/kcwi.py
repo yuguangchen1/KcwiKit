@@ -940,6 +940,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             small slicer.
         montagepy (bool): use MontagePy for drizzling? Otherwise, use the command
             line Montage installation. Both require proper installation.
+        crr (bool): perform final CRR when stacking based on flux outliers?
+        crr_save_files (bool): save trimmed cubes with CRs masked?
+        crrthresh (float): Default value = 100. Sets the threshold level above
+            which pixels are flagged as CRs. Not super reliable yet - better to
+            flag them in 2D images at the beginning of KCWI_DRP.
 
     Returns:
         None
