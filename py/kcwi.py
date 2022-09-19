@@ -7,7 +7,7 @@ from astropy.io import ascii
 from astropy.io import fits
 from astropy import wcs
 from astropy import coordinates
-from astropy import units
+from astropy import units as u
 from astropy import time
 from astropy import stats
 from astropy import table
@@ -15,7 +15,7 @@ import pyregion
 from reproject import reproject_interp
 from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
-from PyAstronomy import pyasl
+# from PyAstronomy import pyasl
 from scipy import interpolate
 from scipy import signal
 from scipy import ndimage
@@ -24,10 +24,12 @@ from scipy import ndimage
 import matplotlib
 import matplotlib.pyplot as plt
 import pyregion
-from fpdf import FPDF
+from fpdf import FPDF #fpdf2
 from tqdm import tqdm
 import pdb
 import time as ostime
+from specutils.utils import wcs_utils
+import pathlib
 
 # MontagePy
 try:
@@ -135,7 +137,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         "med_z":0.,
         "background_subtraction":False,
         "background_level":-1000,
-        "wave_ref":np.array([0., 0.]), 
+        "wave_ref":np.array([0., 0.]),
         "nwave":0,
         "dwave":0.
     }
@@ -496,7 +498,8 @@ def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='heliocentric'):
 
     # air -> vac
     if flag_vac==False:
-        wave_vac=pyasl.airtovac2(wave_old)
+        # wave_vac=pyasl.airtovac2(wave_old) # PyAstronomy doesn't work on Mac M1 8/14/22?
+        wave_vac=wcs_utils.air_to_vac(wave_old*u.Angstrom).value
     else:
         wave_vac = wave_old.copy()
 
@@ -797,12 +800,12 @@ def kcwi_resample_wave(hdu, newhdr, method='cubic'):
     """
     Resample a cube to match the wavelength direction to a different header.
 
-    Args: 
+    Args:
         hdu (astropy HDU): input hdu
         newhdr (astropy header): header containing the new wavelength grid
         order (str): interpolation method or 'mask'
 
-    Returns: 
+    Returns:
         astropy.io.fits.PrimaryHDU: resampled data cube in the form of HDU
     """
 
@@ -821,7 +824,7 @@ def kcwi_resample_wave(hdu, newhdr, method='cubic'):
         if method != 'mask':
             mask = ~np.isfinite(spec)
             spec = np.nan_to_num(spec)
-            
+
             # No good data, skip
             if np.sum(spec)==0:
                 continue
@@ -844,9 +847,9 @@ def kcwi_resample_wave(hdu, newhdr, method='cubic'):
             newspec = newmask
 
         newdata[:, i] = newspec
-    
+
     newdata = newdata.reshape((len(newwave), hdu.shape[1], hdu.shape[2]))
-    
+
     newhdu = hdu.copy()
     newhdu.header['NAXIS3'] = newhdr['NAXIS3']
     newhdu.header['CRPIX3'] = newhdr['CRPIX3']
@@ -861,8 +864,8 @@ def kcwi_resample_wave(hdu, newhdr, method='cubic'):
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
-               overwrite=False,keep_trim=True,keep_mont=False,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, montagepy=False):
+               overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
+               use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False):
     """
     Stacking the individual data cubes.
 
@@ -884,11 +887,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         weights (list-like): weights of the individual cubes if using non-default.
         overwrite (bool): overwrite the cached files that was generated in
             previous runs?
-        wave_ref ([float, float]): [CRPIX3, CRVAL3] of the fianl wavelength grid. 
+        wave_ref ([float, float]): [CRPIX3, CRVAL3] of the fianl wavelength grid.
             Will override the parfile.
         dwave (float): CD3_3 of the final wavelength grid. Will override par file.
         nawave (int): NAXIS3 of the final wavelength grid. Will override par file.
-        wave_interp_method (str): interpolation method for wavelength direction. 
+        wave_interp_method (str): interpolation method for wavelength direction.
             Only applies when spatial method is 'drizzle'.
         keep_trim (bool): cache the trimmed data cubes?
         keep_mont (bool): cache the resampled data cubes?
@@ -958,7 +961,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         drizzle=par["drizzle"]
         if drizzle==0:
             drizzle=0.7
-    
+
     if wave_ref[1]==0:
         wave_ref = par['wave_ref']
 
@@ -1413,6 +1416,32 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             #print(newcubev.shape)
             #print(newcubem.shape)
             #print(newcubee.shape)
+
+    # CR Final Rejection
+    if crr:
+        crrfn=trimfn[i].replace('.trim.fits','.crr.fits')
+        crrvfn=trimvfn[i].replace('.trim.fits','.crr.fits')
+        crrmfn=trimmfn[i].replace('.trim.fits','.crr.fits')
+        crrefn=trimefn[i].replace('.trim.fits','.crr.fits')
+
+        fits.PrimaryHDU(data0).writeto(crrfn, overwrite=True)
+        fits.PrimaryHDU(vdata0).writeto(crrvfn, overwrite=True)
+        fits.PrimaryHDU(mdata0).writeto(crrmfn, overwrite=True)
+        fits.PrimaryHDU(edata0).writeto(crrefn, overwrite=True)
+
+        os.system(f'python {pathlib.Path(__file__).parent.resolve()}/kcwi_crr.py {crrfn} {crrvfn} {crrmfn} {crrefn}')
+
+        data0 = fits.open(crrfn)[0].data
+        vdata0 = fits.open(crrvfn)[0].data
+        mdata0 = fits.open(crrmfn)[0].data
+        edata0 = fits.open(crrefn)[0].data
+
+        if crr_save_files==False:
+            os.remove(crrfn)
+            os.remove(crrvfn)
+            os.remove(crrmfn)
+            os.remove(crrefn)
+
 
 
     # Stacking!!!

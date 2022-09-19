@@ -43,7 +43,7 @@ narg=len(sys.argv)
 
 # should be three (including routine name)
 if narg != 4:
-    print("Usage: python kcwi_masksky_ds9.py <imagename> <regionname>")
+    print("Usage: python kcwi_masksky_ds9.py <imagename> <regionname> <outfname>")
     print("imagename : used for array dimensions and filename purposes, ")
     print("            must be an .fits image.")
     print("regionname: name of region file containing ds9 mask regions")
