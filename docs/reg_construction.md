@@ -2,9 +2,6 @@
 ## A guide for making regions files for the KCWI DRP.
 ### Last updated: 9/19/2022
 
-When $a \ne 0$, there are two solutions to $(ax^2 + bx + c = 0)$ and they are
-$$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
-
 For some quick examples see `mizar:/scr/kbss-kcwi/tier1drp/kcwi_jul21/2021jul05/redux`
 
 ## Sky Subtraction Regions (`.reg`)
@@ -52,7 +49,7 @@ For standard stars and science targets, draw regions (ellipses) around continuum
 
 ### Line Emission (`_icube_2d.reg`)
 
-The science datacubes are deprojected back into a 2D image and line emission (typically Ly$\alpha$) is marked.
+The science datacubes are deprojected back into a 2D image and line emission (typically Ly&alpha) is marked.
 
 For standard stars and science targets, find emission lines and draw boxes around emission. Don't worry about the continuum emission since the `_icube.thum.reg` files will take care of that. Save regions in **Physical** coordinates as well.
 
