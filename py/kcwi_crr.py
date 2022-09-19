@@ -9,9 +9,9 @@ import sys
 # check args
 narg=len(sys.argv)
 
-# should be three (including routine name)
-if narg != 5:
-    print("Usage: python kcwi_crr.py <crrfn> <crrvfn> <crrmfn> <crrefn>")
+# should be six (including routine name)
+if narg != 6:
+    print("Usage: python kcwi_crr.py <crrfn> <crrvfn> <crrmfn> <crrefn> [threshold {100}]")
     exit()
 
 # read arg values
@@ -19,6 +19,11 @@ crrfn=sys.argv[1]
 crrvfn=sys.argv[2]
 crrmfn=sys.argv[3]
 crrefn=sys.argv[4]
+
+if sys.argv[5]:
+    threshold = sys.argv[5]
+else:
+    threshold = 100
 
 icube = fits.open(crrfn)[0].data
 vcube = fits.open(crrvfn)[0].data
@@ -36,7 +41,7 @@ def onepix(coords):
         noise = np.sqrt(np.median(vcube[:,wave, x,y]))
 
         for exp in range(icube.shape[0]):
-            if icube[exp,wave,y,x] > 100*noise:
+            if icube[exp,wave,y,x] > threshold*noise:
                 return (exp,wave,y,x, 1)
 
 

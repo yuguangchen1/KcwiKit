@@ -865,7 +865,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False):
+               use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False, crrthresh=100):
     """
     Stacking the individual data cubes.
 
@@ -1429,7 +1429,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         fits.PrimaryHDU(mdata0).writeto(crrmfn, overwrite=True)
         fits.PrimaryHDU(edata0).writeto(crrefn, overwrite=True)
 
-        os.system(f'python {pathlib.Path(__file__).parent.resolve()}/kcwi_crr.py {crrfn} {crrvfn} {crrmfn} {crrefn}')
+        # running in this manner to untilize multiprocessing
+        os.system(f'python {pathlib.Path(__file__).parent.resolve()}/kcwi_crr.py {crrfn} {crrvfn} {crrmfn} {crrefn} {crrthresh}')
 
         data0 = fits.open(crrfn)[0].data
         vdata0 = fits.open(crrvfn)[0].data

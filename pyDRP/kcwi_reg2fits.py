@@ -43,7 +43,7 @@ narg=len(sys.argv)
 
 # should be three (including routine name)
 if narg != 4:
-    print("Usage: python kcwi_masksky_ds9.py <imagename> <regionname> <outfname>")
+    print("Usage: python kcwi_reg2fits.py <imagename> <regionname> <outfname>")
     print("imagename : used for array dimensions and filename purposes, ")
     print("            must be an .fits image.")
     print("regionname: name of region file containing ds9 mask regions")
@@ -84,7 +84,7 @@ shape = (header["NAXIS1"], header["NAXIS2"])
 #print(shape)
 # load in the region file
 r = pyregion.open(regfname).as_imagecoord(header)
-print(r[0].coord_format)
+# print(r[0].coord_format)
 m = r.get_mask(hdu=hdu_list[0])
 #print(r)
 #print(m[m!=True])
