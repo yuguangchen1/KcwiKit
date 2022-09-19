@@ -49,7 +49,7 @@ For standard stars and science targets, draw regions (ellipses) around continuum
 
 ### Line Emission (`_icube_2d.reg`)
 
-The science datacubes are deprojected back into a 2D image and line emission (typically Ly&alpha) is marked.
+The science datacubes are deprojected back into a 2D image and line emission (typically Ly&alpha;) is marked.
 
 For standard stars and science targets, find emission lines and draw boxes around emission. Don't worry about the continuum emission since the `_icube.thum.reg` files will take care of that. Save regions in **Physical** coordinates as well.
 
