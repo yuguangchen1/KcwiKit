@@ -21,15 +21,15 @@ def subcube(hdu,wave,writefn='',box=[-1,-1,-1,-1],pixel_wave=False,pixel_box=Tru
     hdu: HDU object or str
         The input data cube in header-data unit or a string specifying its
         path.
-    
+
     wave: array_like with 2 elements
         The lower and higher boundaries in the wavelength direction.
-    
+
     writefn: str, optional
         The file name of the output HDU.
-    
+
     box: array_like with 4 elements, optional
-        Coordinates of the lower-left and upper-right corners of the sub-cube. 
+        Coordinates of the lower-left and upper-right corners of the sub-cube.
 
     pixel_wave: bool, optional
         Using pixel coordinate in the wavelength direction? Default: False.
@@ -43,7 +43,7 @@ def subcube(hdu,wave,writefn='',box=[-1,-1,-1,-1],pixel_wave=False,pixel_box=Tru
             The extracted sub-cube.
 
     """
-    
+
     if type(hdu)==type(''):
         tmp=fits.open(hdu)
         hdu=tmp[0]
@@ -83,7 +83,7 @@ def subcube(hdu,wave,writefn='',box=[-1,-1,-1,-1],pixel_wave=False,pixel_box=Tru
 
         if pixel_box==False:
             # real RA DEC from WCS
-                        
+
             qra=(ra0 <= box[0]) & (ra0 > box[2])
             qdec=(dec0 >= box[1]) & (dec0 < box[3])
         else:
@@ -104,16 +104,16 @@ def subcube(hdu,wave,writefn='',box=[-1,-1,-1,-1],pixel_wave=False,pixel_box=Tru
         newhdu.header['CRVAL2']=newdec[0]
 
 
-    
+
     if writefn!='':
         newhdu.writeto(writefn,overwrite=True)
-        
+
     return newhdu
 
 
 def collapse_header(hdr):
     """
-    Quick wrapper to collapse a 3-D header into a 2-D one. 
+    Quick wrapper to collapse a 3-D header into a 2-D one.
 
     Parameters
     ----------
@@ -124,7 +124,7 @@ def collapse_header(hdr):
     hdr_img: collapsed header
 
     """
-    
+
     hdr_img=hdr.copy()
     hdr_img['NAXIS']=2
     del hdr_img['NAXIS3']
@@ -136,20 +136,20 @@ def collapse_header(hdr):
     del hdr_img['CRPIX3']
 
     return hdr_img
-    
 
 
-def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=False,writefn='',ignore_blank=False):
+
+def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=False,usesum=False,writefn='',ignore_blank=False):
     """
-    Collapse the cube into a 2-D image whitelight/narrowband image. 
-    
+    Collapse the cube into a 2-D image whitelight/narrowband image.
+
     Parameters
     ----------
     hdu: HDU object or string of the file name
-        
+
     wavebin: array_like (n*2 elements), optional
-        The range of which the cube is collapsed into. 
-        Can be split in n seperate ranges. The final image will be collapsed into one. 
+        The range of which the cube is collapsed into.
+        Can be split in n seperate ranges. The final image will be collapsed into one.
 
     usepix: bool, optional
         Use pixel indices for wavebin?
@@ -158,7 +158,7 @@ def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=F
         variance cube?
 
     weight: bool, optional
-        Output image in weight, instead of variance. 
+        Output image in weight, instead of variance.
 
     usemean: bool, optional
         Using mean instead of median.
@@ -166,11 +166,11 @@ def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=F
     ignore_blank: bool, optional
         Ignore blank images without writing files.
     """
-    
+
     # default wavebin
     tab_grating=np.array(['BL','BM'])
     tab_wave=np.array([500,300])
-    
+
     if type(hdu)==type(''):
         ofn=hdu
         tmp=fits.open(hdu)
@@ -188,7 +188,7 @@ def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=F
     if len(wavebin.shape)==1:
         wavebin=np.array([wavebin])
 
-    
+
     # get cube parameters
     wcs0=wcs.WCS(hdu.header)
     shape0=hdu.data.shape
@@ -232,15 +232,19 @@ def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=F
         cube_0=hdu.data.copy()
         cube_0[cube_0==0]=np.nan
         if var==False:
-            if usemean==False:
-                img=np.nanmedian(cube_0[qwave,:,:],axis=0)
-            else:
+            if usemean:
                 img=np.nanmean(cube_0[qwave,:,:],axis=0)
+            elif usesum:
+                img=np.nansum(cube_0[qwave,:,:],axis=0)
+            else:
+                img=np.nanmedian(cube_0[qwave,:,:],axis=0)
         else:
             if usemean==False:
-                img=np.nanmedian(cube_0[qwave,:,:],axis=0)/np.sum(np.isfinite(cube_0[qwave,:,:]),axis=0)
-            else:
                 img=np.nanmean(cube_0[qwave,:,:],axis=0)/np.sum(np.isfinite(cube_0[qwave,:,:]),axis=0)
+            elif usesum:
+                img=np.nansum(cube_0[qwave,:,:],axis=0)
+            else:
+                img=np.nanmedian(cube_0[qwave,:,:],axis=0)/np.sum(np.isfinite(cube_0[qwave,:,:]),axis=0)
 
     # convert to weight
     if weight==True:
@@ -262,7 +266,7 @@ def collapse(hdu,wavebin=[-1.,-1.],usepix=False,var=False,weight=False,usemean=F
 def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcubefn='',c_radec=False,
                 r_arcsec=False,source_seg=False):
     """
-    Extract 1-D spectrum from data cubes. 
+    Extract 1-D spectrum from data cubes.
 
     Parameters
     ----------
@@ -271,40 +275,40 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
         path.
 
     center: array_like, optional
-        Center of the source in pixel position. 
+        Center of the source in pixel position.
 
     radius: float, optional
-        Pixel radius of the source.  
+        Pixel radius of the source.
 
     writefn: string, optional
-        Filename of the output spectra. 
+        Filename of the output spectra.
 
     maskfn: string, optional
-        Continuum mask generated by SExtractor. 
+        Continuum mask generated by SExtractor.
 
     sourcemap: string, optional
-        Filename of the source map in FITS. 
+        Filename of the source map in FITS.
 
     mcubefn: string, optional
         Name of the mask cube.
 
     c_radec: bool, optional
         Using RA Dec in decimal degrees, instead of pixel postion, for the center of the source.
-    
+
     r_arcsec: bool, optional
         Using arcsec in radius, instead of pixel radius.
 
     var: bool, optional
         Variance cube?
-        
+
     source_seg: bool, optional
-        Accompanying sourcemap. When True, the file name points to the segmented map generated by 
+        Accompanying sourcemap. When True, the file name points to the segmented map generated by
         SExtractor.
-        
+
     """
 
 
-    if ((center is None) or (radius is None)) and (sourcemap==''): 
+    if ((center is None) or (radius is None)) and (sourcemap==''):
         print('[Error] Specify extraction area.')
         return -1
 
@@ -317,7 +321,7 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
 
     # cosmology
     cos=cosmology.LambdaCDM(70.,0.3,0.7)
-    
+
     # 0 - the original HDU
     hdu0=hdu
     wcs0=wcs.WCS(hdu0.header)
@@ -343,16 +347,16 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
 
         fitsmask_hdu=fits.open(maskfn)[0]
         fitsmask=fitsmask_hdu.data.copy()
-            
+
         # remove the central souce itself
         center_int=np.round(np.flip(center_pix,axis=-1)).astype(int)
         mask_card=fitsmask[center_int[0],center_int[1]]
-            
+
         if mask_card!=0:
             fitsmask[fitsmask==mask_card]=0
 
         fitsmask=fitsmask.astype(bool)
-            
+
         # expand by 1 pix
         tmpmask=fitsmask.copy()
         xindex,yindex=np.where(tmpmask==True)
@@ -365,12 +369,12 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
                 fitsmask[xindex[i],yindex[i]-1]=True
             if yindex[i]+1<fitsmask.shape[1]:
                 fitsmask[xindex[i],yindex[i]+1]=True
-    
+
     if fitsmask is not None:
-        mask_3d=np.repeat([fitsmask],sz[0],axis=0)    
+        mask_3d=np.repeat([fitsmask],sz[0],axis=0)
     else:
         mask_3d=np.zeros_like(hdu0.data)
-    
+
     if mcubefn!='':
         hdu_mcube=fits.open(mcubefn)[0]
         mask_3d=np.bitwise_or(mask_3d,hdu_mcube.data)
@@ -378,7 +382,7 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
     hdu1=hdu0.copy()
     hdu1.data[(mask_3d==True)]=0
 
-    
+
     # source map
     if sourcemap=='':
         xx,yy=np.meshgrid(np.arange(sz[2]),np.arange(sz[1]))
@@ -404,7 +408,7 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
     data2=hdu1.data.copy()
     data2[data2==0]=np.nan
 
-    
+
     spec=np.nansum(data2*np.repeat([source],sz[0],axis=0),axis=(1,2))
     spec=np.nan_to_num(spec)*dx*dy
     #plt.plot(spec,drawstyle='steps-mid')
@@ -458,44 +462,44 @@ def onedspec(hdu,center=None,radius=None,writefn='',maskfn='',sourcemap='',mcube
 
     return hdu_write
 
- 
+
 
 
 def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_reduce=True):
     """
-    Conduct continuum-subtraction to cubes. 
+    Conduct continuum-subtraction to cubes.
 
     Parameters
     ----------
     hdu: HDU object or str
         The input data cube in header-data unit or a string specifying its
-        path. 
+        path.
 
     wrange: N*2 array
-        The range of wavelength in Angstrom for the polynomial fit. 
+        The range of wavelength in Angstrom for the polynomial fit.
 
     writefn: str, optional
         The file name of the output HDU.
 
     fit_order: int, optional
-        Order of the polynomial fit. 
+        Order of the polynomial fit.
 
     w_center: float, optional
-        If w_vel==True, this specifies the center of the wavelength. 
+        If w_vel==True, this specifies the center of the wavelength.
 
     w_vel: bool, optional
         Use velocity in km/s for the wrange bins, intead of Angstrom.
 
     auto_reduce: bool, optional
-        Automatically reduce the fitting order to 0, if all valid wavelength bins are on 
-        one side of the central wavelength. 
+        Automatically reduce the fitting order to 0, if all valid wavelength bins are on
+        one side of the central wavelength.
 
     """
 
     if w_vel==True and w_center is None:
         print('[Error] Central wavelength required for w_vel=True.')
         return -1
-    
+
     if type(hdu)==type(''):
         ofn=hdu
         tmp=fits.open(hdu)
@@ -505,7 +509,7 @@ def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_re
 
     data_new=hdu.data.copy()
     data_new=np.nan_to_num(data_new)
-    
+
     sz=hdu.shape
     wcs0=wcs.WCS(hdu.header)
     wave0=wcs0.wcs_pix2world(np.zeros(sz[0]),np.zeros(sz[0]),np.arange(sz[0]),0)
@@ -513,7 +517,7 @@ def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_re
     if not (w_center is None):
         v0=(wave0-w_center)/w_center*3e5
 
-    
+
     # Get wavelength bins
     if type(wrange)==type([]):
         wrange=np.array(wrange)
@@ -533,7 +537,7 @@ def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_re
         index0=np.bitwise_or(index0,index)
 
 
-   
+
     # Fitting
     cube_cont=np.zeros(data_new.shape)
     for i in range(sz[2]):
@@ -567,28 +571,28 @@ def cont_sub(hdu,wrange,writefn='',fit_order=1,w_center=None,w_vel=False,auto_re
     return hdu_new
 
 
-        
 
 
 
 
 
 
-def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_range=None,pa_range=[0,360],dr=None,dpa=None,redshift=-1.,drizzle=1.0,c_radec=False,clean=True,compress=False,automask_basename='',exact_area=False,montage=False):
+
+def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_range=None,pa_range=[0,360],dr=None,dpa=None,redshift=-1.,drizzle=1.0,c_radec=False,clean=True,compress=False,automask_basename='',segnum=0,exact_area=False,montage=False):
     """
-    Resample a cube in cartesian coordinate to cylindrical coordinate (with ellipticity) 
-    using drizzling algorithm. 
+    Resample a cube in cartesian coordinate to cylindrical coordinate (with ellipticity)
+    using drizzling algorithm.
     This function can be used to extract 2D spectrum along radial/angular direction.
 
     Parameters
     ----------
     hdu: HDU object or str
         The input data cube in header-data unit or a string specifying its
-        path. 
-    
+        path.
+
     center: array_like,
-        Specify the central of the cylindrical projection, in pixel coordinate. 
-        Can be switched to [RA, DEC] with 'c_radec' parameter. 
+        Specify the central of the cylindrical projection, in pixel coordinate.
+        Can be switched to [RA, DEC] with 'c_radec' parameter.
 
     writefn: str, optional
         The file name of the output HDU.
@@ -599,25 +603,25 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
     ellip: float, optional
         The axis-ratio of the series of ellipses to which the cartesian cube will be
-        project to. 
-        Default: 1. - circle. 
+        project to.
+        Default: 1. - circle.
 
     pa: float, optional
-        The position angle of the *MAJOR* axis that is east of the north direction. 
-        Default: 0. 
+        The position angle of the *MAJOR* axis that is east of the north direction.
+        Default: 0.
 
     nr: int, optional, CHANGE TO KPC
         Number of pixels of the post-projection cubes in the radial direction.
-        Default: The closest integer that makes the size of individual pixels to 
-        be 0.3 arcsec in the major axis. 
+        Default: The closest integer that makes the size of individual pixels to
+        be 0.3 arcsec in the major axis.
 
-    npa: int, optional 
-        Number of pixels of the post-projection cubes in the angular direction. 
-        Default: The closest integer that makes the size of individual pixels to 
-        be 1 degree. 
+    npa: int, optional
+        Number of pixels of the post-projection cubes in the angular direction.
+        Default: The closest integer that makes the size of individual pixels to
+        be 1 degree.
 
     r_range: array_like with 2 elements, optional
-        The boundaries of the radii to be extracted for the major axis. 
+        The boundaries of the radii to be extracted for the major axis.
         Default: 0 to the minimum radius to include all signals in the input cube.
 
     pa_range: array_like with 2 elements, optional
@@ -625,28 +629,28 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
         Default: [0,360]
 
     drizzle: float, optional
-        The drizzling factor. 
+        The drizzling factor.
         Default: 1.
 
     c_radec: bool, optional
-        Use [RA, DEC] in decimal degrees to specify the center. 
+        Use [RA, DEC] in decimal degrees to specify the center.
 
     clean: bool, optional
         Clean up the temp files.
         Default: True
 
     compress: bool, optional
-        Remove the axis with only 1 pixel. This will lose the WCS information on 
-        the corresponding axis, but is convenient for displaying purposes. 
+        Remove the axis with only 1 pixel. This will lose the WCS information on
+        the corresponding axis, but is convenient for displaying purposes.
         Default: False
 
     automask_basefn: str, optional
-        Automatically apply default *_seg.fits and *.reg masks. This keyword is 
-        overridden by maskfn keyword. Directory + base name of the *_seg.fits and 
+        Automatically apply default *_seg.fits and *.reg masks. This keyword is
+        overridden by maskfn keyword. Directory + base name of the *_seg.fits and
         *.reg masks.
-        
+
     exact_area: bool, optional
-        Get the exact 2D-area map. Default is a 1D collapsed approximate.  
+        Get the exact 2D-area map. Default is a 1D collapsed approximate.
 
     montage: bool, optional
         Use Montage? Defalt = True. If set False, use reproject.interp
@@ -655,14 +659,14 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     -------
         (hdu5, ahdu5)
         hdu5: HDU object
-            The resampled data cube. 
+            The resampled data cube.
         ahdu5: HDU object
             The resampled area coverage cube.
     """
-    
+
     if not os.path.exists('kcwi_tools'):
         os.makedirs('kcwi_tools')
-    
+
     if type(hdu)==type(''):
         ofn=hdu
         tmp=fits.open(hdu)
@@ -676,7 +680,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
     # cosmology
     cos=cosmology.LambdaCDM(70.,0.3,0.7)
-    
+
     # 0 - the original HDU
     hdu0=hdu
     wcs0=wcs.WCS(hdu0.header)
@@ -695,32 +699,63 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
             for i in range(mask_3d.shape[0]):
                 mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],reg_mask)
-        
+
         if '.fits' in maskfn:
-            hdu_mask=fits.open(maskfn)[0]
-            mask=bool(hdu_mask.data)
+            fitsmask_hdu=fits.open(maskfn)[0]
+            fitsmask=fitsmask_hdu.data.copy()
+
+            # remove the central souce itself
+            center_int=np.round(np.flip(center,axis=-1)).astype(int)-1
+            if segnum==0:
+                mask_card=fitsmask[center_int[0],center_int[1]]
+            else:
+                mask_card=int(segnum)
+
+
+            if mask_card!=0:
+                fitsmask[fitsmask==mask_card]=0
+
+            fitsmask=fitsmask.astype(bool)
+
+            # expand by 1 pix
+            tmpmask=fitsmask.copy()
+            xindex,yindex=np.where(tmpmask==True)
+            for i in range(xindex.shape[0]):
+                if xindex[i]-1>=0:
+                    fitsmask[xindex[i]-1,yindex[i]]=True
+                if xindex[i]+1<fitsmask.shape[0]:
+                    fitsmask[xindex[i]+1,yindex[i]]=True
+                if yindex[i]-1>=0:
+                    fitsmask[xindex[i],yindex[i]-1]=True
+                if yindex[i]+1<fitsmask.shape[1]:
+                    fitsmask[xindex[i],yindex[i]+1]=True
+
+            all_mask=fitsmask
             for i in range(mask_3d.shape[0]):
-                mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],mask)
-    
+                mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],all_mask)
+
     elif automask_basename!='':
         regmask_fn=automask_basename+'.reg'
         fitsmask_fn=automask_basename+'_seg.fits'
-        
+
         all_mask=np.zeros(hdu0.shape[1:3],dtype=int)
 
         if os.path.isfile(fitsmask_fn):
             fitsmask_hdu=fits.open(fitsmask_fn)[0]
             fitsmask=fitsmask_hdu.data.copy()
-            
+
             # remove the central souce itself
             center_int=np.round(np.flip(center,axis=-1)).astype(int)-1
-            mask_card=fitsmask[center_int[0],center_int[1]]
-            
+            if segnum==0:
+                mask_card=fitsmask[center_int[0],center_int[1]]
+            else:
+                mask_card=segnum
+
             if mask_card!=0:
                 fitsmask[fitsmask==mask_card]=0
 
             fitsmask=fitsmask.astype(bool)
-            
+
             # expand by 1 pix
             tmpmask=fitsmask.copy()
             xindex,yindex=np.where(tmpmask==True)
@@ -738,7 +773,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
 
         if os.path.isfile(regmask_fn):
-            
+
             hdr_tmp=collapse_header(hdu0.header)
 
             reg=pyregion.open(regmask_fn)
@@ -749,12 +784,12 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
         for i in range(mask_3d.shape[0]):
             mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],all_mask)
-        
+
     hdu0_mask=hdu0.copy()
     hdu0_mask.data[mask_3d==True]=0
-        
-        
-        
+
+
+
     # Skewing
     hdu1=hdu0_mask.copy()
     hdr1=hdu1.header
@@ -772,11 +807,11 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
         elif ellip>1:
             CD_shr[0,0]=CD_rot[0,0]*ellip
             CD_shr[0,1]=CD_rot[0,1]*ellip
-        
+
         ROT=np.array([[np.cos(-rot),-np.sin(-rot)],
             [np.sin(-rot),np.cos(-rot)]])
         CD1=np.matmul(ROT,CD_shr)
-        
+
         hdr1['CD1_1']=CD1[0,0]
         hdr1['CD1_2']=CD1[0,1]
         hdr1['CD2_1']=CD1[1,0]
@@ -792,7 +827,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     if c_radec==True:
         tmp=wcs1.wcs_world2pix(center[0],center[1]+0.3/3600.,0,0)
         ref_pix=[float(tmp[0]),float(tmp[1])]
-        
+
         center_ad=center
         tmp=wcs0.wcs_world2pix(center[0],center[1],0,0)
         center_pix=[float(tmp[0]),float(tmp[1])]
@@ -809,7 +844,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     hdr2['CRVAL1']=0.
     hdr2['CRVAL2']=-90+0.3/3600.
     wcs2=wcs.WCS(hdr2)
-    
+
     cube2fn='kcwi_tools/cart2cyli_cube2.fits'
     hdu2.writeto(cube2fn,overwrite=True)
 
@@ -827,7 +862,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             nx0=int(np.round(pa_range[1]-pa_range[0]/dpa))
             dx0=dpa
             pa_range[1]=pa_range[0]+dx0*nx0
-    
+
     # Split too large pixels
     if dx0>1:
         nx=int(dx0)*nx0
@@ -835,7 +870,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     else:
         nx=nx0
         dx=dx0
-    # Montage can't handle DPA>180, splitting. Also need padding to avoid edge effect. 
+    # Montage can't handle DPA>180, splitting. Also need padding to avoid edge effect.
     nx3=np.round(nx/3)
     nx3=np.array([nx3,nx3,nx-2*nx3])
     xr3=np.zeros((2,3))
@@ -873,7 +908,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             dy=dr
             r_range[1]=r_range[0]+dy*ny
 
-    
+
     # Set up headers
     hdr3_1=hdu2.header.copy()
     hdr3_1['NAXIS1']=int(nx3[0])
@@ -924,7 +959,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             hdu3_1=fits.open(cube3_1fn)[0]
             hdu3_2=fits.open(cube3_2fn)[0]
             hdu3_3=fits.open(cube3_3fn)[0]
-            
+
             data4=np.zeros((hdu3_1.shape[0],hdu3_1.shape[1],
                 hdu3_1.shape[2]+hdu3_2.shape[2]+hdu3_3.shape[2]-30))
             data4[:,:,0:hdu3_1.shape[2]-10]=hdu3_1.data[:,:,5:hdu3_1.shape[2]-5]
@@ -935,7 +970,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             data4[data4==0]=np.nan
             #hdutmp=fits.PrimaryHDU(data4)
             #hdutmp.writeto('kcwi_tools/tmp.fits',overwrite=True)
-            
+
             # Area
             area3_1fn=cube3_1fn.replace('.fits','_area.fits')
             area3_2fn=cube3_2fn.replace('.fits','_area.fits')
@@ -1019,15 +1054,15 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
     hdr5['CD1_1A']=-dx0
     hdr5['CD2_2A']=dy
     hdr5['CD3_3A']=hdr5['CD3_3']
-    
+
 
     if redshift>0:
         a_dis=(cos.arcsec_per_kpc_proper(redshift)).value
-        
+
         hdr5['CRVAL2A']=r_range[0]/a_dis
         hdr5['CUNIT2A']='kpc'
         hdr5['CD2_2A']=dy/a_dis
-        
+
         hdr5['CRVAL3A']=hdr5['CRVAL3']/(1+redshift)
         hdr5['CD3_3A']=hdr5['CD3_3']/(1+redshift)
 
@@ -1069,7 +1104,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
                 area5[:,i]=np.sum(tmp,axis=1)
         #warnings.resetwarnings()
 
-    
+
     # Compress
     if compress==True:
         if nx0==1:
@@ -1115,7 +1150,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             del hdr5['CD3_3']
             del hdr5['CD3_3A']
             data5=np.transpose(np.squeeze(data5,axis=2))
-            
+
             if exact_area:
                 ahdr5=hdr5.copy()
                 area5=np.transpose(np.squeeze(area5,axis=2))
@@ -1194,11 +1229,11 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             del hdr5['CD3_3A']
             data5=np.transpose(np.squeeze(data5,axis=1))
 
-            
+
     hdu5=fits.PrimaryHDU(data5,header=hdr5)
     ahdu5=fits.PrimaryHDU(area5,header=ahdr5)
 
-            
+
 
     if writefn!='':
         hdu5.writeto(writefn,overwrite=True)
@@ -1206,9 +1241,9 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
     if clean==True:
         os.system('rm -f kcwi_tools/cart2cyli*')
-        
+
     return (hdu5,ahdu5)
-    
+
 
 
 def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_range=None,pa_range=[0,360],
@@ -1286,22 +1321,22 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
 
     if not os.path.exists('kcwi_tools/'):
         os.makedirs('kcwi_tools')
-    
+
     if type(hdu)==type(''):
         ofn=hdu
         tmp=fits.open(hdu)
         hdu=tmp[0]
     else:
         ofn=''
-        
+
     # cosmology
     cos=cosmology.LambdaCDM(70.,0.3,0.7)
-    
+
     # 0 - the original HDU
     hdu0=hdu
     wcs0=wcs.WCS(hdu0.header)
     sz=hdu0.data.shape
-    
+
     # masking
     mask_3d=np.zeros(hdu0.shape,dtype=bool)
     if maskfn!='':
@@ -1381,14 +1416,14 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
         center_pix=center
         tmp=wcs0.all_pix2world(center[0],center[1],0,0)
         center_ad=[float(tmp[0]),float(tmp[1])]
-        
+
     # build location vectors of cube pixels
     xx,yy=np.meshgrid(np.arange(sz[2]),np.arange(sz[1]))
     xx=(xx-center_pix[0])*np.sqrt(hdu0.header['CD1_1']**2+hdu0.header['CD2_1']**2)*3600
     yy=(yy-center_pix[1])*np.sqrt(hdu0.header['CD1_2']**2+hdu0.header['CD2_2']**2)*3600
     if ellip!=1:
         rot=np.radians(pa)
-        
+
         xx_circ=np.zeros(xx.shape)
         yy_circ=np.zeros(yy.shape)
         for i in range(xx.shape[1]):
@@ -1408,11 +1443,11 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
                 #vec1=np.matmul(FRAC,np.matmul(ROT1,vec4))
                 xx_circ[j,i]=vec1[0]
                 yy_circ[j,i]=vec1[1]
-         
+
     else:
         xx_circ=xx
         yy_circ=yy
-        
+
     rr_circ=np.sqrt(xx_circ**2+yy_circ**2)
     theta_circ=np.zeros(rr_circ.shape)
     theta_circ[(yy_circ==0) & (xx_circ>0)]=270
@@ -1423,8 +1458,8 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
     theta_circ[(xx_circ>0) & (yy_circ<0)]=theta_circ[(xx_circ>0) & (yy_circ<0)]+180
     #plt.pcolormesh(yy_circ)
 
-        
-        
+
+
     # setup target grid
     # x dimension
     if (npa==None) and (dpa==None):
@@ -1442,7 +1477,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
 
     nx=nx0
     dx=dx0
-    
+
     # y dimension
     if r_range==None:
         p_corner_x=np.array([0,0,sz[2]-1,sz[2]-1])
@@ -1465,24 +1500,24 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
             ny=int(np.round((r_range[1]-r_range[0])/dr))
             dy=dr
             r_range[1]=r_range[0]+dy*ny
-            
+
     # project to 2D
     x_index=np.linspace(pa_range[0],pa_range[1],nx+1)
     y_index=np.linspace(r_range[0],r_range[1],ny+1)
     data5=np.zeros((sz[0],y_index.shape[0]-1,x_index.shape[0]-1))
-    
+
     for i in range(x_index.shape[0]-1):
         for j in range(y_index.shape[0]-1):
             qq=(theta_circ >= x_index[i]) & (theta_circ < x_index[i+1]) & (rr_circ >= y_index[j]) & (rr_circ < y_index[j+1])
             if np.sum(qq)==0:
                 continue
-            
+
             element=hdu0_mask.data[:,qq]
             element[element==0]=np.nan
-            
+
             data5[:,j,i]=np.nanmean(element,axis=1)
-            
-    
+
+
     # header
     hdr5=hdu0.header.copy()
     hdr5['NAXIS1']=nx0
@@ -1525,7 +1560,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
     hdr5['CD2_2A']=dy
     hdr5['CD3_3A']=hdr5['CD3_3']
 
-    
+
     if redshift>0:
         a_dis=(cos.arcsec_per_kpc_proper(redshift)).value
 
@@ -1535,7 +1570,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
 
         hdr5['CRVAL3A']=hdr5['CRVAL3']/(1+redshift)
         hdr5['CD3_3A']=hdr5['CD3_3']/(1+redshift)
-    
+
     # Compress
     if compress==True:
         if nx0==1:
@@ -1581,7 +1616,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
             del hdr5['CD3_3']
             del hdr5['CD3_3A']
             data5=np.transpose(np.squeeze(data5,axis=2))
-            
+
         elif ny==1:
             tmp=hdr5.copy()
             hdr5['NAXIS']=2
@@ -1627,11 +1662,8 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
             data5=np.transpose(np.squeeze(data5,axis=1))
 
     hdu5=fits.PrimaryHDU(data5,header=hdr5)
-    
+
     if writefn!='':
         hdu5.writeto(writefn,overwrite=True)
 
     return hdu5
-                
-    
-    
