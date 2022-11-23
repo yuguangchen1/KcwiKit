@@ -168,7 +168,7 @@ def kcwi_medfilter_actonone(args, par):
         cube0 = cube.copy()
         shape = cube.shape
         #mcube = hdl['MASK'].data.copy()
-	mcube = fits.open(cubefn.replace('icube', 'mcube'))[0].data.copy()
+        mcube = fits.open(cubefn.replace('icube', 'mcube'))[0].data.copy()
         fcube = mcube #hdl['FLAGS'].data.copy()
 
         # interpolation flag
