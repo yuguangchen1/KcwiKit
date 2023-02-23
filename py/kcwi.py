@@ -1029,14 +1029,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     if path.isfile(fn[0]+"_i"+suffix+".fits") == False:
         suffix="cubed"
 
+
+    vfn=[i+'_v'+suffix+'.fits' for i in fn]
+    mfn=[i+'_m'+suffix+'.fits' for i in fn]
+    efn=[i+'_e'+suffix+'.fits' for i in fn]
+
     if medcube == True:
         fn=[i+'_icube.med.fits' for i in fn]
     else:
         fn=[i+'_i'+suffix+'.fits' for i in fn]
 
-    vfn=[i+'_v'+suffix+'.fits' for i in fn]
-    mfn=[i+'_m'+suffix+'.fits' for i in fn]
-    efn=[i+'_e'+suffix+'.fits' for i in fn]
     # fn=[i+'_i'+suffix+'.fits' for i in fn]
 
 
