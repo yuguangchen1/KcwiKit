@@ -960,9 +960,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     else:
         suffix="cubes"
 
-    if medcube == True:
-        suffix = 'cube.med'
-
     if method.lower()!='drizzle':
         if method.lower()=='nearest-neighbor':
             method_flag='nei'
@@ -1031,10 +1028,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
     if path.isfile(fn[0]+"_i"+suffix+".fits") == False:
         suffix="cubed"
+
+    if medcube == True:
+        fn=[i+'_icube.med.fits' for i in fn]
+    else:
+        fn=[i+'_i'+suffix+'.fits' for i in fn]
+
     vfn=[i+'_v'+suffix+'.fits' for i in fn]
     mfn=[i+'_m'+suffix+'.fits' for i in fn]
     efn=[i+'_e'+suffix+'.fits' for i in fn]
-    fn=[i+'_i'+suffix+'.fits' for i in fn]
+    # fn=[i+'_i'+suffix+'.fits' for i in fn]
 
 
     if preshiftfn=='':
@@ -1664,7 +1667,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,
     noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,
     background_subtraction=False,background_level=-1000.,method='interp',
-    use_regmask=True, medcube=False):
+    use_regmask=True):
 
     """
     Align individual data cubes and correct their relative astrometry using
@@ -1720,9 +1723,6 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         suffix='cubes'
     else:
         suffix='cubed'
-
-    if medcube == True:
-        suffix = 'cube.med'
 
     parfn=fnlist.replace('.list','.par')
     par=kcwi_stack_readpar(parfn)
