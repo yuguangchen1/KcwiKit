@@ -899,7 +899,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
-               use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False, crrthresh=100):
+               use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
+               crrthresh=100, medcube=False):
     """
     Stacking the individual data cubes.
 
@@ -1663,7 +1664,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,
     noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,
     background_subtraction=False,background_level=-1000.,method='interp',
-    use_regmask=True):
+    use_regmask=True, medcube=False):
 
     """
     Align individual data cubes and correct their relative astrometry using
