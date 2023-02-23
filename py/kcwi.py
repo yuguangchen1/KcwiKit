@@ -959,6 +959,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     else:
         suffix="cubes"
 
+    if medcube == True:
+        suffix = 'cube.med'
+
     if method.lower()!='drizzle':
         if method.lower()=='nearest-neighbor':
             method_flag='nei'
@@ -1716,6 +1719,9 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         suffix='cubes'
     else:
         suffix='cubed'
+
+    if medcube == True:
+        suffix = 'cube.med'
 
     parfn=fnlist.replace('.list','.par')
     par=kcwi_stack_readpar(parfn)
