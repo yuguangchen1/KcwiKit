@@ -959,6 +959,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         suffix="cubed"
     else:
         suffix="cubes"
+    
+    if medcube:
+        suffix='cube'
 
     if method.lower()!='drizzle':
         if method.lower()=='nearest-neighbor':
@@ -1033,13 +1036,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     vfn=[i+'_v'+suffix+'.fits' for i in fn]
     mfn=[i+'_m'+suffix+'.fits' for i in fn]
     efn=[i+'_e'+suffix+'.fits' for i in fn]
-
-    if medcube == True:
-        fn=[i+'_icube.med.fits' for i in fn]
-    else:
-        fn=[i+'_i'+suffix+'.fits' for i in fn]
-
-    # fn=[i+'_i'+suffix+'.fits' for i in fn]
+    fn=[i+'_i'+suffix+'.fits' for i in fn]
 
 
     if preshiftfn=='':
@@ -1149,8 +1146,19 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             # science cube
             hdulist=fits.open(fn[i])
             # IDL or Python?
-            if len(hdulist)==1:
+
+            if len(hdulist) == 1:
                 reduxflag = 'idl'
+            elif len(hdulist) == 4:
+                reduxflag = 'py'
+            else:
+                raise ValueError('Reduction pipeline not recognized.')
+                return
+
+            if medcube == True:
+                reduxflag = 'medcube'
+
+            if reduxflag == 'idl':
                 hdu_i,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0)
                 print('     Vcorr = '+str(vcorr))
                 hdu_i.header['VCORR'] = (vcorr, 'Heliocentric Velocity Correction')
@@ -1166,8 +1174,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_m,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0,mask=True)
                 hdulist.close()
 
-            elif len(hdulist)==4:
-                reduxflag = 'py'
+            elif reduxflag == 'py':
 
                 hdulist, vcorr = kcwi_vachelio(hdulist, hdr_ref=hdr0)
                 print('     Vcorr = '+str(vcorr))
@@ -1175,9 +1182,18 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
                 hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)
+            
+            elif reduxflag == 'medcube':
+                #reduxflag == 'py'
+                hdulist, vcorr = kcwi_vachelio(hdulist, hdr_ref=hdr0)
+                print('     Vcorr = '+str(vcorr))
+                hdu_i = fits.open(fn[i].replace(suffix,'cube.med'))[0] #hdulist[0]
+
+                hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
+                hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)                
 
             else:
-                raise ValueError('Reduction pipeline not recognized.')
+                raise ValueError('reduxflag not assigned')
                 return
 
             # region masks
@@ -1201,11 +1217,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_v.data[:,mask_reg] = np.nan
                 hdu_m.data[:,mask_reg] = 128
 
+            
             # Infinity check
-            q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
-            hdu_i.data[q]=np.nan
-            hdu_v.data[q]=np.nan
-            hdu_m.data[q]=128
+            if medcube == False:
+                q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
+                hdu_i.data[q]=np.nan
+                hdu_v.data[q]=np.nan
+                hdu_m.data[q]=128
 
 
             # check EXPTIME
@@ -1216,7 +1234,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             edata=hdu_i.data*0.+exptime
             q=(hdu_m.data != 0)
             edata[q]=0
-            hdu_i.data[q] = np.nan
+            if medcube == False:
+                hdu_i.data[q] = np.nan
             hdu_e=fits.PrimaryHDU(edata,header=hdu_i.header)
             hdu_e.header['BUNIT']='s'
 
@@ -1545,7 +1564,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
-
+        
+        if medcube == True:
+            weight = np.ones(var.shape)
 
         #weight[~np.isfinite(weight)]=0
 
