@@ -900,7 +900,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-               crrthresh=100, medcube=False):
+               crrthresh=100, medcube=False, nsigma_clip=1.5):
     """
     Stacking the individual data cubes.
 
@@ -946,6 +946,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         crrthresh (float): Default value = 100. Sets the threshold level above
             which pixels are flagged as CRs. Not super reliable yet - better to
             flag them in 2D images at the beginning of KCWI_DRP.
+        nsigma_clip (float): only used for red cameras for sigma clipping to 
+            remove residual cosmic rays. Default=1.5.
 
     Returns:
         None
@@ -1076,6 +1078,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdulist.close()
     wcstmp=wcs.WCS(hdrtmp).copy()
     center=wcstmp.wcs_pix2world((wcstmp.pixel_shape[0]-1)/2.,(wcstmp.pixel_shape[1]-1)/2.,0,0,ra_dec_order=True)
+
+    # camera
+    camera = hdrtmp['CAMERA']
+    if camera != 'RED' and camera != 'BLUE':
+        raise ValueError('Unknown camera type - {}'.format(camera))
+        return
 
     if par['stack_ad'][0]!=-1:
         center=par['stack_ad']
@@ -1550,6 +1558,18 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mask[~np.isfinite(var)]=1
         mask[var==0]=1
 
+        if camera=='RED' and nsigma_clip > 0:
+            # additional sigma clipping
+            clip_img = img.copy()
+            clip_img[mask!=0] = np.nan
+            clip_std = np.nanstd(clip_img, axis=0)
+            clip_std = np.repeat(clip_std[np.newaxis, :, :], len(fn), axis=0)
+            clip_med = np.nanmedian(clip_img, axis=0)
+            clip_med = np.repeat(clip_med[np.newaxis, :, :], len(fn), axis=0)
+
+            clip_mask = (np.abs(clip_img - clip_med) > clip_std * nsigma_clip)
+            mask[clip_mask]=1
+
         q=(mask==0)
         if np.sum(q)==0:
             continue
@@ -1753,8 +1773,6 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     # wavelength range
     if wavebin[0]==-1:
         wavebin=par['wavebin']
-        if wavebin[0]==-1:
-            wavebin=[4000.,5000.]
 
     # define alignment box
     if box[0]==-1:
@@ -1843,6 +1861,16 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     wcstmp=wcs.WCS(hdrtmp).copy()
     center=wcstmp.wcs_pix2world((wcstmp.pixel_shape[0]-1)/2.,(wcstmp.pixel_shape[1]-1)/2.,0,0,ra_dec_order=True)
 
+    # red or blue?
+    camera = hdrtmp['CAMERA']
+    if camera != 'RED' and camera !='BLUE':
+        raise ValueError('Unknown camera type - {}'.format(camera))
+        return
+
+    # wavebin
+    if wavebin[0]==-1:
+        wavebin=[hdrtmp['WAVGOOD0'],hdrtmp['WAVGOOD1']]
+
     if par['align_ad'][0]!=-1:
         center=par['align_ad']
 
@@ -1926,7 +1954,10 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
             for jj in range(sz[1]):
                 q=(img[ii,jj,qwave]!=0) & (np.isfinite(img[ii,jj,qwave])==1)
                 if np.sum(q)>0:
-                    thum[ii,jj]=np.mean(img[ii,jj,qwave][q])
+                    if camera=='BLUE':
+                        thum[ii,jj]=np.mean(img[ii,jj,qwave][q])
+                    elif camera=='RED':
+                        thum[ii,jj]=np.median(img[ii,jj,qwave][q])
 
         # additional trimming for PyDRP
         if len(hdulist)==4:
@@ -2285,8 +2316,6 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     # wavelength range
     if wavebin[0]==-1:
         wavebin=par['wavebin']
-        if wavebin[0]==-1:
-            wavebin=[4000.,5000.]
 
     # search size
     if search_size==-1000:
@@ -2349,6 +2378,8 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
 
     # collapsing
+    if wavebin[0]==-1:
+        wavebin=[hdu_cube.header['WAVGOOD0'],hdu_cube.header['WAVGOOD1']]
     qwave=(wave>wavebin[0]) & (wave<wavebin[1])
 
     hdr_img=hdu_cube.header.copy()
