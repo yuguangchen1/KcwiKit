@@ -900,7 +900,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-               crrthresh=100, medcube=False, nsigma_clip=1.5):
+               crrthresh=100, medcube=False, nsigma_clip=1.5, multiple_grangles=False):
     """
     Stacking the individual data cubes.
 
@@ -946,7 +946,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         crrthresh (float): Default value = 100. Sets the threshold level above
             which pixels are flagged as CRs. Not super reliable yet - better to
             flag them in 2D images at the beginning of KCWI_DRP.
-        nsigma_clip (float): only used for red cameras for sigma clipping to 
+        nsigma_clip (float): only used for red cameras for sigma clipping to
             remove residual cosmic rays. Default=1.5.
 
     Returns:
@@ -961,7 +961,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         suffix="cubed"
     else:
         suffix="cubes"
-    
+
     if medcube:
         suffix='cube'
 
@@ -1190,7 +1190,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
                 hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)
-            
+
             elif reduxflag == 'medcube':
                 #reduxflag == 'py'
                 hdulist, vcorr = kcwi_vachelio(hdulist, hdr_ref=hdr0)
@@ -1198,7 +1198,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_i = fits.open(fn[i].replace(suffix,'cube.med'))[0] #hdulist[0]
 
                 hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
-                hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)                
+                hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)
 
             else:
                 raise ValueError('reduxflag not assigned')
@@ -1225,7 +1225,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_v.data[:,mask_reg] = np.nan
                 hdu_m.data[:,mask_reg] = 128
 
-            
+
             # Infinity check
             if medcube == False:
                 q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
@@ -1584,7 +1584,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
-        
+
         if medcube == True:
             weight = np.ones(var.shape)
 
