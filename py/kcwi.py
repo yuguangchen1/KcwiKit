@@ -139,7 +139,9 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         "background_level":-1000,
         "wave_ref":np.array([0., 0.]),
         "nwave":0,
-        "dwave":0.
+        "dwave":0.,
+        "multiple_grangles":False,
+        "mg_wavgood":False
     }
 
     with open(parname,'r') as file:
@@ -237,6 +239,18 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         q=q[0]
         ele=lins[q].split()
         par["stack_ad"]=np.array(ele[1:3]).astype(np.float)
+
+    q=np.where(np.array(keys)=="multiple_grangles")[0]
+    if len(q) > 0:
+        q=q[0]
+        ele=lins[q].split()
+        par["multiple_grangles"]=ele[1]
+
+    q=np.where(np.array(keys)=="mg_wavgood")[0]
+    if len(q) > 0:
+        q=q[0]
+        ele=lins[q].split()
+        par["mg_wavgood"]=ele[1]
 
 
     # Global keywords
@@ -900,7 +914,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False):
+               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False, mg_wavgood = False):
     """
     Stacking the individual data cubes.
 
@@ -948,8 +962,18 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             flag them in 2D images at the beginning of KCWI_DRP.
         nsigma_clip (float): only used for red cameras for sigma clipping to
             remove residual cosmic rays. Default=1.5.
+<<<<<<< HEAD
         npix_trim (int): number of pixels to trim from the edges of a cube. Default = 3.
             May want npix_trim = 1 for Large slicer.
+=======
+        multiple_grangles (bool): Are we stacking frames with different
+            grating angles? Same slicer, same grating, just adjusting grangle{b,r}
+            or RCWAVE in the header.
+        mg_wavgood (bool): restrict the summed wavelength range from each grating
+            to be between WAVGOOD0 and WAVGOOD1. Used in combining exposures from
+            different grating angles so excess noise is not introduced in
+            overlapping wavelength region.
+>>>>>>> d6b96ef (multiple grating angles now supported with multiple_grangles and mg_wavgood keywords)
 
     Returns:
         None
@@ -1003,6 +1027,12 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         dimension=par["stack_dimension"]
         if dimension[0]==-1:
             dimension=[100,100]
+
+    if multiple_grangles == False:
+        multiple_grangles = par['multiple_grangles']
+
+    if mg_wavgood == False:
+        mg_wavgood = par['mg_wavgood']
 
     if drizzle==0:
         drizzle=par["drizzle"]
@@ -1130,6 +1160,37 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         hdr0['NAXIS3'] = int(nwave)
     if dwave!=0:
         hdr0['CD3_3'] = dwave
+
+    # adding support for multiple gratings
+    if multiple_grangles:
+        print('Dataset contains multiple grating angles which will be coadded')
+        # figure out the wavelength ranges
+        crval3s=[fits.getheader(i)['CRVAL3'] for i in fn]
+        # print(crval3s)
+        minwave_index = np.argmin(crval3s)
+        maxwave_index = np.argmax(crval3s)
+
+        lohdr = fits.getheader(fn[minwave_index])
+        hihdr = fits.getheader(fn[maxwave_index])
+
+        lowave = lohdr['CRVAL3']
+        hiwave = (hihdr['CRVAL3'] - hihdr['CRPIX3']) + (hihdr['NAXIS3'] * hihdr['CD3_3'])
+
+        if lohdr['CD3_3'] != hihdr['CD3_3']:
+            print('Wavelength resolution is not the same.')
+            print(f"Low CRVAL3: {lohdr['CD3_3']} A/pix, High CRVAL3: {hihdr['CD3_3']} A/pix")
+            print('This functionality is not (yet) supported.')
+
+        stack_res = lohdr['CD3_3']
+        stack_wave_dim = (hiwave-lowave)*lohdr['CD3_3']
+
+        print(f"Final Wavelength Grid: {lowave} - {hiwave} A, {stack_res} A/pix, {stack_wave_dim} pixels, NAXIS3 = {stack_wave_dim+1}")
+        hdr0['CRVAL3'] = lowave
+        hdr0['NAXIS3'] = int(stack_wave_dim + 1)
+        if mg_wavgood:
+            print('     Restricting to WAVGOOD0 - WAVGOOD1')
+        # grid expansion dealt with later on
+
 
     hdr0.totextfile(fnhdr,overwrite=1)
 
@@ -1372,8 +1433,52 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdu_i.data = hdu_i.data * fluxnorm[i]
             hdu_v.data = hdu_v.data * fluxnorm[i]**2
 
+            if multiple_grangles:
+                # expand out frame and pad with zeros
+
+                # current wavelength range
+                frame_min_wave = hdu_i.header['CRVAL3']
+                frame_max_wave = (hdu_i.header['CRVAL3'] - hdu_i.header['CRPIX3']) + (hdu_i.header['NAXIS3'] * hdu_i.header['CD3_3'])
+                frame_res = hdu_i.header['CD3_3']
+
+                lo_pad = int((frame_min_wave - lowave)/frame_res)
+                hi_pad = int((hiwave - frame_max_wave)/frame_res)
+                # print(lo_pad, hi_pad)
+
+                hdu_i.data = np.pad(hdu_i.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=0)
+                hdu_v.data = np.pad(hdu_v.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=np.nan) # think about this
+                hdu_m.data = np.pad(hdu_m.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=0) # think about this
+                hdu_e.data = np.pad(hdu_e.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=0)
+
+                if mg_wavgood:
+                    # set data outside of [WAVGOOD0,WAVGOOD1] to zero
+                    stack_wave = (np.arange(hdr0['NAXIS3']) - hdr0['CRPIX3'] + 1) * hdr0['CD3_3'] + hdr0['CRVAL3']
+                    # print(stack_wave)
+                    # print(hdu_i.header['WAVGOOD0'], hdu_i.header['WAVGOOD1'])
+                    hdu_i.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
+                    hdu_v.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = np.nan
+                    hdu_m.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
+                    hdu_e.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
+
+                # update headers
+                hdu_i.header['CRVAL3'] = lowave
+                hdu_i.header['NAXIS3'] = int(stack_wave_dim + 1)
+
+                hdu_v.header['CRVAL3'] = lowave
+                hdu_v.header['NAXIS3'] = int(stack_wave_dim + 1)
+
+                hdu_m.header['CRVAL3'] = lowave
+                hdu_m.header['NAXIS3'] = int(stack_wave_dim + 1)
+
+                hdu_e.header['CRVAL3'] = lowave
+                hdu_e.header['NAXIS3'] = int(stack_wave_dim + 1)
+
+
+                # print(hdu_i.data.shape)
+
+
             # wavelength interpolation
-            if method=='drizzle':
+            if (method=='drizzle') & (multiple_grangles == False):
                 # "reproject" package can handle wavelength interpolation, only
                 # Montage need this step.
                 if not kcwi_check_samewave(hdu_i.header, hdr0):
