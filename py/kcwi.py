@@ -90,7 +90,7 @@ def get_wav_axis(header):
     pix0 = header["CRPIX{0}".format(axis)]
 
     #Calculate and return
-    return np.array([wav0 + (i - pix0) * dwav for i in range(nwav)])
+    return np.array([wav0 + (i - pix0 + 1) * dwav for i in range(nwav)])
 
 
 # Read parameter files for alignment, stacking, and astrometry
@@ -2051,8 +2051,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                             if background_level!=-1000:
                                 cut[cut<background_level]=0
                                 cut0[cut0<background_level]=0
-                        cut[cut<0]=0
-                        cut0[cut0<0]=0
+                        cut[cut<0]=1e-10
+                        cut0[cut0<0]=1e-10
                         mult=cut0*cut
                         if np.sum(mult!=0)>0:
                             crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
@@ -2150,8 +2150,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                             if background_level!=-1000:
                                 cut[cut<background_level]=0
                                 cut0[cut0<background_level]=0
-                        cut[cut<0]=0
-                        cut0[cut0<0]=0
+                        cut[cut<0]=1e-10
+                        cut0[cut0<0]=1e-10
                         mult=cut0*cut
                         crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
 
