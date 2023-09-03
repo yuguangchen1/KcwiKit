@@ -2533,12 +2533,14 @@ def kcwi_deproject(fn, cubed=False):
     trim_tab=ascii.read(fn,format="no_header")
     files=trim_tab["col1"]
     for file in tqdm(files):
+        ofn = f'{file}_i{suffix}.fits'
+        ofhdr = fits.getheader(ofn)
         trimfn = file.split('kb')[1]
         print('kb'+trimfn)
         trim = fits.open('kcwi_stack/kb'+trimfn+'_i'+suffix+'.trim.fits')[0]
         img, arr = reproject_interp(msk_3d, trim.header, order = 'bicubic')
         img[np.isnan(trim.data)]=np.nan
-        fits.PrimaryHDU(np.round(img)).writeto('../redux/kb'+trimfn+'_icubes.stackmask.fits', overwrite=True)
+        fits.PrimaryHDU(np.round(img), header = ofhdr).writeto('../redux/kb'+trimfn+'_icubes.stackmask.fits', overwrite=True)
         # fig, ax = plt.subplots(1,2)
         # ax[0].imshow(img[5,:,:], origin='lower')
         # ax[1].imshow(trim.data[1778,:,:], origin = 'lower')

@@ -900,7 +900,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-               crrthresh=100, medcube=False, nsigma_clip=1.5):
+               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3):
     """
     Stacking the individual data cubes.
 
@@ -946,8 +946,10 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         crrthresh (float): Default value = 100. Sets the threshold level above
             which pixels are flagged as CRs. Not super reliable yet - better to
             flag them in 2D images at the beginning of KCWI_DRP.
-        nsigma_clip (float): only used for red cameras for sigma clipping to 
+        nsigma_clip (float): only used for red cameras for sigma clipping to
             remove residual cosmic rays. Default=1.5.
+        npix_trim (int): number of pixels to trim from the edges of a cube. Default = 3.
+            May want npix_trim = 1 for Large slicer.
 
     Returns:
         None
@@ -961,7 +963,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         suffix="cubed"
     else:
         suffix="cubes"
-    
+
     if medcube:
         suffix='cube'
 
@@ -1157,7 +1159,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
             if len(hdulist) == 1:
                 reduxflag = 'idl'
-            elif len(hdulist) == 4:
+            elif len(hdulist) >= 4:
                 reduxflag = 'py'
             else:
                 raise ValueError('Reduction pipeline not recognized.')
@@ -1190,7 +1192,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
                 hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)
-            
+
             elif reduxflag == 'medcube':
                 #reduxflag == 'py'
                 hdulist, vcorr = kcwi_vachelio(hdulist, hdr_ref=hdr0)
@@ -1198,7 +1200,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_i = fits.open(fn[i].replace(suffix,'cube.med'))[0] #hdulist[0]
 
                 hdu_v = fits.PrimaryHDU(hdulist['UNCERT'].data**2, hdu_i.header)
-                hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)                
+                hdu_m = fits.PrimaryHDU(hdulist['FLAGS'].data, hdu_i.header)
 
             else:
                 raise ValueError('reduxflag not assigned')
@@ -1225,7 +1227,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_v.data[:,mask_reg] = np.nan
                 hdu_m.data[:,mask_reg] = 128
 
-            
+
             # Infinity check
             if medcube == False:
                 q=((hdu_i.data==0) | (~np.isfinite(hdu_i.data)) | (hdu_v.data==0) | (~np.isfinite(hdu_v.data)) )
@@ -1319,7 +1321,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 # remove PyDRP edge problem
                 if reduxflag=='py':
-                    n_pix = 3
+                    n_pix = npix_trim #3 by default
                     flag_dim = mask.shape
                     mask[0:n_pix,:] = 128
                     mask[:,0:n_pix] = 128
@@ -1584,7 +1586,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             weight=np.repeat(np.repeat(np.array(weights)[:,np.newaxis],
                              hdr0['NAXIS3'],axis=1)[:,:,np.newaxis],dimension[1],axis=2).astype(float)
         weight[~q]=np.nan
-        
+
         if medcube == True:
             weight = np.ones(var.shape)
 
@@ -1710,7 +1712,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
     orientation=-1000.,dimension=[-1.,-1.],preshiftfn='',trim=[-1,-1],cubed=False,
     noalign=False,display=True,search_size=-1000,conv_filter=-1000,upfactor=-1000.,
     background_subtraction=False,background_level=-1000.,method='interp',
-    use_regmask=True):
+    use_regmask=True, npix_trim = 4):
 
     """
     Align individual data cubes and correct their relative astrometry using
@@ -1749,6 +1751,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         method (str): 'interp' (bilinear interpolation) or 'exact' (drizzling).
         use_regmask (bool): set if certain pixels in individual files need to be
             masked by Region files.
+        npix_trim (int): number of pixels to trim cubes by. Default = 4. May want
+            npix_trim = 1 for Large slicer.
 
 
     Returns:
@@ -1960,11 +1964,11 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
                         thum[ii,jj]=np.median(img[ii,jj,qwave][q])
 
         # additional trimming for PyDRP
-        if len(hdulist)==4:
+        if len(hdulist)>=4:
             mask = hdulist['FLAGS']
             mask_dim = mask.shape
             # set edge pixels = 128
-            n_pix = 4 # nominally 4 pix, really only need 1
+            n_pix = npix_trim # nominally 4 pix, really only need 1
             mask.data[:,0:n_pix,:] = 128
             mask.data[:,:,0:n_pix] = 128
             mask.data[:,mask_dim[1]-n_pix:mask_dim[1],:] = 128
