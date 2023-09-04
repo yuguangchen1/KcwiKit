@@ -915,6 +915,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
                crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False, mg_wavgood = False):
+
     """
     Stacking the individual data cubes.
 
