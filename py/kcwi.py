@@ -914,7 +914,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
+<<<<<<< HEAD
                crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False, mg_wavgood = False):
+=======
+               crrthresh=100, medcube=False, nsigma_clip=1.5, multiple_grangles=False, mg_wavgood = False):
+>>>>>>> d6b96ef5cc360fc248212c50ea8f7b34b9fe4b34
     """
     Stacking the individual data cubes.
 
@@ -962,10 +966,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             flag them in 2D images at the beginning of KCWI_DRP.
         nsigma_clip (float): only used for red cameras for sigma clipping to
             remove residual cosmic rays. Default=1.5.
-<<<<<<< HEAD
         npix_trim (int): number of pixels to trim from the edges of a cube. Default = 3.
             May want npix_trim = 1 for Large slicer.
-=======
         multiple_grangles (bool): Are we stacking frames with different
             grating angles? Same slicer, same grating, just adjusting grangle{b,r}
             or RCWAVE in the header.
@@ -973,7 +975,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             to be between WAVGOOD0 and WAVGOOD1. Used in combining exposures from
             different grating angles so excess noise is not introduced in
             overlapping wavelength region.
->>>>>>> d6b96ef (multiple grating angles now supported with multiple_grangles and mg_wavgood keywords)
+
 
     Returns:
         None
