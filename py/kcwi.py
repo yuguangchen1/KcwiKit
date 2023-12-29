@@ -141,7 +141,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         "nwave":0,
         "dwave":0.,
         "multiple_grangles":False,
-        "mg_wavgood":False
+        "mg_wavrange":False
     }
 
     with open(parname,'r') as file:
@@ -246,11 +246,11 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
         ele=lins[q].split()
         par["multiple_grangles"]=ele[1]
 
-    q=np.where(np.array(keys)=="mg_wavgood")[0]
+    q=np.where(np.array(keys)=="mg_waverange")[0]
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["mg_wavgood"]=ele[1]
+        par["mg_waverange"]=ele[1]
 
 
     # Global keywords
@@ -914,7 +914,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
+<<<<<<< Updated upstream
                crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False, mg_wavgood = False):
+=======
+               crrthresh=100, medcube=False, nsigma_clip=1.5, multiple_grangles=False, mg_waverange = False):
+>>>>>>> Stashed changes
     """
     Stacking the individual data cubes.
 
@@ -965,12 +969,16 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         multiple_grangles (bool): Are we stacking frames with different
             grating angles? Same slicer, same grating, just adjusting grangle{b,r}
             or RCWAVE in the header.
-        mg_wavgood (bool): restrict the summed wavelength range from each grating
+        mg_waverange (bool): restrict the summed wavelength range from each grating
             to be between WAVGOOD0 and WAVGOOD1. Used in combining exposures from
             different grating angles so excess noise is not introduced in
+<<<<<<< Updated upstream
             overlapping wavelength region.
         npix_trim (int): number of pixels to trim from the edges of a cube. Default = 3.
             May want npix_trim = 1 for Large slicer.
+=======
+            overlapping wavelength region. UPDATE!
+>>>>>>> Stashed changes
 
     Returns:
         None
@@ -1028,8 +1036,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     if multiple_grangles == False:
         multiple_grangles = par['multiple_grangles']
 
-    if mg_wavgood == False:
-        mg_wavgood = par['mg_wavgood']
+    # if mg_waverange == False:
+    #     mg_waverange = par['mg_waverange']
 
     if drizzle==0:
         drizzle=par["drizzle"]
@@ -1184,7 +1192,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         print(f"Final Wavelength Grid: {lowave} - {hiwave} A, {stack_res} A/pix, {stack_wave_dim} pixels, NAXIS3 = {stack_wave_dim+1}")
         hdr0['CRVAL3'] = lowave
         hdr0['NAXIS3'] = int(stack_wave_dim + 1)
-        if mg_wavgood:
+        if mg_waverange:
             print('     Restricting to WAVGOOD0 - WAVGOOD1')
         # grid expansion dealt with later on
 
@@ -1447,15 +1455,62 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_m.data = np.pad(hdu_m.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=0) # think about this
                 hdu_e.data = np.pad(hdu_e.data, ((lo_pad, hi_pad), (0,0), (0,0)), mode='constant', constant_values=0)
 
-                if mg_wavgood:
+                stack_wave = (np.arange(hdr0['NAXIS3']) - hdr0['CRPIX3'] + 1) * hdr0['CD3_3'] + hdr0['CRVAL3'] # wavelength array
+
+                if mg_waverange == 'wavgood':
                     # set data outside of [WAVGOOD0,WAVGOOD1] to zero
-                    stack_wave = (np.arange(hdr0['NAXIS3']) - hdr0['CRPIX3'] + 1) * hdr0['CD3_3'] + hdr0['CRVAL3']
+
                     # print(stack_wave)
                     # print(hdu_i.header['WAVGOOD0'], hdu_i.header['WAVGOOD1'])
                     hdu_i.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
                     hdu_v.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = np.nan
                     hdu_m.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
                     hdu_e.data[(stack_wave < hdu_i.header['WAVGOOD0']) | (stack_wave > hdu_i.header['WAVGOOD1'])] = 0
+
+                if mg_waverange == 'slice': # slice by slice wavegood0 and wavegood1, maximizing each frame's data
+                    os.path.dirname(fn[i])
+                    wavemap = fits.open(f"{os.path.dirname(fn[i])}/{hdu_i.header['ARCFL'].replace('.fits', '_wavemap.fits')}")[0].data
+                    slicemap = fits.open(f"{os.path.dirname(fn[i])}/{hdu_i.header['ARCFL'].replace('.fits', '_slicemap.fits')}")[0].data
+
+
+                    for slice in range(12): # first 12 slices slant up
+                        bl = wavemap[np.where(slicemap==slice)[0][0],np.where(slicemap==slice)[1][0]]
+                        tr = wavemap[np.where(slicemap==slice)[0][-1],np.where(slicemap==slice)[1][-1]]
+                        print(f'BL: {bl:.1f}, TR: {tr:1f}')
+                        for w in range(hdu_i.data.shape[0]):
+                            index_y,index_x=np.where(hdu_m.data[w,:,:]==0)
+                            if (len(index_y) == 0) | (len(index_x) == 0):
+                                continue
+                            working_slice = np.min(index_x) + slice
+                            if (stack_wave[w] < bl + 5) | (stack_wave[w] > tr - 5):
+                                hdu_i.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+                                hdu_v.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = np.nan
+                                hdu_m.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+                                hdu_e.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+
+                    for slice in range(12,24): # right 12 slices slant down
+                        br = wavemap[np.where(slicemap==slice)[0][0],np.where(slicemap==slice)[1][-1]]
+                        tl = wavemap[np.where(slicemap==slice)[0][-1],np.where(slicemap==slice)[1][0]]
+                        print(f'BR: {br:.1f}, TL: {tl:1f}')
+                        for w in range(hdu_i.data.shape[0]):
+                            index_y,index_x=np.where(hdu_m.data[w,:,:]==0)
+                            if (len(index_y) == 0) | (len(index_x) == 0):
+                                continue
+                            working_slice = np.min(index_x) + slice
+                            if (stack_wave[w] < br + 5) | (stack_wave[w] > tl - 5):
+                                hdu_i.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+                                hdu_v.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = np.nan
+                                hdu_m.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+                                hdu_e.data[w,:,working_slice][hdu_m.data[w, :, working_slice] == 0] = 0
+
+                if isinstance(mg_waverange, list): #[[4500, 5500], [6500, 7500], ... n frames]
+                     low_wave = mg_waverange[i][0]
+                     high_wave = mg_waverange[i][1]
+
+                     hdu_i.data[(stack_wave < low_wave) | (stack_wave > high_wave)] = 0
+                     hdu_v.data[(stack_wave < low_wave) | (stack_wave > high_wave)] = np.nan
+                     hdu_m.data[(stack_wave < low_wave) | (stack_wave > high_wave)] = 0
+                     hdu_e.data[(stack_wave < low_wave) | (stack_wave > high_wave)] = 0
 
                 # update headers
                 hdu_i.header['CRVAL3'] = lowave
