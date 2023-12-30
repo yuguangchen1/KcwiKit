@@ -305,6 +305,8 @@ def kcwi_medfilter_actonone(args, par):
                             int(min( (shape[0] - 1), (kk + par['zbin'] / 2))) )
                     medcube[kk, jj, ii] = np.nanmedian(cube[zrange[0]:zrange[1], yrange[0]:yrange[1], ii])
 
+        # fits.PrimaryHDU(medcube).writeto('medcube.fits', overwrite=True)
+        # print('Done writing out')
         # interpolate bad data
         """
         hdu_tmp = fits.PrimaryHDU(medcube)
@@ -403,9 +405,18 @@ def kcwi_medfilter_actonone(args, par):
                         tmpflag[qlin3[qq]] = 0
 
                         qlin3 = np.where(tmpflag == -300)[0]
-                        li = interp1d(qlin0, tmpmed[qlin0], kind='linear',
-                                bounds_error=False, fill_value='extrapolate')
-                        tmpmed[qlin3] = li(qlin3)
+                        # li = interp1d(qlin0, tmpmed[qlin0], kind='linear',
+                        #         bounds_error=False, fill_value='extrapolate')
+                        # tmpmed[qlin3] = li(qlin3)
+
+                        if len(qlin0) > 1:
+                            li = interp1d(qlin0, tmpmed[qlin0], kind='linear',
+                                    bounds_error=False, fill_value='extrapolate')
+                            tmpmed[qlin3] = li(qlin3)
+                        elif len(qlin0) == 1:
+                            tmpmed[qlin3] = tmpmed[qlin0][0]
+                        else:
+                            tmpmed[qlin3] = 0
 
 
         # recover padding
