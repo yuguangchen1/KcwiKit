@@ -914,11 +914,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=True,keep_mont=True,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-<<<<<<< Updated upstream
-               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, multiple_grangles=False, mg_wavgood = False):
-=======
-               crrthresh=100, medcube=False, nsigma_clip=1.5, multiple_grangles=False, mg_waverange = False):
->>>>>>> Stashed changes
+               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3,
+               multiple_grangles=False, mg_waverange = False):
     """
     Stacking the individual data cubes.
 
@@ -972,13 +969,9 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mg_waverange (bool): restrict the summed wavelength range from each grating
             to be between WAVGOOD0 and WAVGOOD1. Used in combining exposures from
             different grating angles so excess noise is not introduced in
-<<<<<<< Updated upstream
-            overlapping wavelength region.
+            overlapping wavelength region. UPDATE!
         npix_trim (int): number of pixels to trim from the edges of a cube. Default = 3.
             May want npix_trim = 1 for Large slicer.
-=======
-            overlapping wavelength region. UPDATE!
->>>>>>> Stashed changes
 
     Returns:
         None
