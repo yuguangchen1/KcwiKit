@@ -63,7 +63,7 @@ ref_fn /scr/yuguangchen/obs/kcwi/plan/q2343/q2343Rs.fits
 
 For a basic stack without a final WCS adjustment (skipping `kcwi_astrometry`), one can omit the `ref_*` lines.
 
-Each of these parameters correspond to arguments in the `kcwi_align`, `kcwi_stack`, or `kcwi_astrometry` functions and additional parameters can be added on new lines. We encourage the reader to check out each of the relevant docstrings (LINK!) for more details and implementation strategies. We outline the basic parameters below:
+Each of these parameters correspond to arguments in the `kcwi_align`, `kcwi_stack`, or `kcwi_astrometry` functions and additional parameters can be added on new lines. We encourage the reader to check out each of the relevant docstrings (see `kcwi/py/kcwi.py`) for more details and implementation strategies. We outline the basic parameters below:
 
 **General Parameters:**
 `dimension x y`: final cube x and y dimensions

@@ -29,4 +29,4 @@ If this was successful, you should be able to run `import kcwi` in an `ipython` 
 
 The stacking code requires `Montage` and the `kcwi` packages to be installed and functioning. Some additional necessary packages include `astropy`, `fpdf`, and `tqdm`.
 
-You should now be able to stack cubes - see the instructions here!
+You should now be able to stack cubes - see the instructions [here](https://github.com/yuguangchen1/kcwi/blob/master/docs/KCWI_post-DRP_stacking.md)!
