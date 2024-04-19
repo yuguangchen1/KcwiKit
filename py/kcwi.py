@@ -900,7 +900,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
                overwrite=False,keep_trim=False,keep_mont=False,method='drizzle',use_astrom=False,
                use_regmask=True, low_mem=False, montagepy=False, crr=False, crr_save_files=False,
-               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3):
+               crrthresh=100, medcube=False, nsigma_clip=1.5, npix_trim = 3, reduxflag=False):
     """
     Stacking the individual data cubes.
 
@@ -1157,13 +1157,14 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdulist=fits.open(fn[i])
             # IDL or Python?
 
-            if len(hdulist) == 1:
-                reduxflag = 'idl'
-            elif len(hdulist) >= 4:
-                reduxflag = 'py'
-            else:
-                raise ValueError('Reduction pipeline not recognized.')
-                return
+            if not reduxflag:
+                if len(hdulist) == 1:
+                    reduxflag = 'idl'
+                elif len(hdulist) >= 4:
+                    reduxflag = 'py'
+                else:
+                    raise ValueError('Reduction pipeline not recognized.')
+                    return
 
             if medcube == True:
                 reduxflag = 'medcube'
@@ -1172,17 +1173,17 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 hdu_i,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0)
                 print('     Vcorr = '+str(vcorr))
                 hdu_i.header['VCORR'] = (vcorr, 'Heliocentric Velocity Correction')
-                hdulist.close()
+                # hdulist.close()
 
                 # variance cube -> sigma cube
                 hdulist=fits.open(vfn[i])
                 hdu_v,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0)
-                hdulist.close()
+                # hdulist.close()
 
                 # mask cube
                 hdulist=fits.open(mfn[i])
                 hdu_m,vcorr=kcwi_vachelio(hdulist[0],hdr_ref=hdr0,mask=True)
-                hdulist.close()
+                # hdulist.close()
 
             elif reduxflag == 'py':
 
