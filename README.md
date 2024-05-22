@@ -1,5 +1,7 @@
 # KCWI Post-Processing and Improvements
 
+<a href="https://ascl.net/2404.003"><img src="https://img.shields.io/badge/ascl-2404.003-blue.svg?colorB=262255" alt="ascl:2404.003" /></a>
+
 `KCWIKit` extends the official KCWI DRP with a variety of stacking tools and DRP improvements. The software offers masking and median filtering scripts to be used while running the KCWI DRP, and a step-by-step KCWI_DRP implementation for finer control over the reduction process. Once the DRP has finished, `KCWIKit` can be used to stack the output cubes via the `Montage` package. Various functions cross-correlate and mosaic the constituent cubes and the final stacked cubes are WCS corrected. Helper functions can then be used to deproject the stacked cube into lower-dimensional representations should the user desire.
 
 This repo is organized as follows:
