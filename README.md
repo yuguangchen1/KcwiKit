@@ -14,7 +14,7 @@ Check the subdirectories for additional instructions and prerequisites.
 
 ## Citing KCWIKit
 
-If you use `KCWIKit`, please cite [Chen et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508...19C).
+If you use `KCWIKit`, please cite the [ASCL entry](https://ascl.net/2404.003) (BibTeX format on [ADS](https://ui.adsabs.harvard.edu/abs/2024ascl.soft04003P)) and [Chen et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508...19C) where the code is implemented.
 
 Developed and maintained by [Nikolaus Prusinski](mailto:nik@astro.caltech.edu) and [Yuguang Chen](mailto:yugchen@ucdavis.edu). If you encounter bugs, have questions on how to run the code, or have feature requests, drop us a line! 
 
