@@ -6,7 +6,8 @@ This repo is organized as follows:
 - docs/ Documentation and Instructions
 - pro/ Improvinng the [IDL pipeline](https://github.com/Keck-DataReductionPipelines/KcwiDRP).
 - py/ Post-DRP alignment, stacking.
-- pyDRP/ Improving the [Python pipeline](https://kcwi-drp.readthedocs.io/en/latest/). 
+- pyDRP/ Improving the [Python pipeline](https://kcwi-drp.readthedocs.io/en/latest/).
+- -gui/ An interactive GUI for the post-DRP reduction, including performing/refining sky subtraction, flux calibration, and telluric correction. 
 
 Check the subdirectories for additional instructions and prerequisites. 
 
