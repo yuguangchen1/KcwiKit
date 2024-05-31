@@ -34,17 +34,20 @@ import zap
 
 """
 Author: Zhuyun Zhuang, with the help from chatGPT! (free version!)
-Date: 05/2024
+Date: 05/28/2024
 Usage: python kcwi_zap_viewer.py
 
 Description: Load data from a directory and allow user to interactively
-perform sky subtraction of KCWI/KCRM data with ZAP, and flux calibration. 
+perform sky subtraction of KCWI/KCRM data with ZAP, flux calibration and telluric correction.
+
+This version is still under development. If you run into any issue, please drop a message to zzhuang at astro.caltech.edu 
 """
 ####Some user-defined setup. People should update it based on their own needs######
 #only set it for test purporse. When it browse the directory, it will start from your favorite directory storing the data :)
 initial_dir = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/noskysub_drp'
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
+#Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
 telgridfile = '/scr/zzhuang/telluric/TelFit_MaunaKea_3100_26100_R20000.fits'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
@@ -647,6 +650,10 @@ class KCWIViewerApp:
             self.scihdr = self.scihdu[0].header
             self.obswave = (np.arange(self.scihdr['NAXIS3']) + 1 - self.scihdr['CRPIX3']) * self.scihdr['CD3_3'] + self.scihdr['CRVAL3']
 
+            #replace the bad pixels (flags >0) with NaNs
+            # self.scihdu[0].data[self.scihdu['FLAGS'].data > 0] = np.nan 
+            # self.scihdu['UNCERT'].data[self.scihdu['FLAGS'].data > 0] = np.nan 
+
         else:
             self.insert_text(f"[ERROR] Wrong science frame! Need to set it to a positive integer. Check the KCWI log for the frame number!")
 
@@ -658,15 +665,24 @@ class KCWIViewerApp:
                 self.skyhdu = self.crop_cube(self.skyhdu) #crop the data cube to good wavelength region
                 self.insert_text(f"[INFO] Loading the DRP-reduced sky frame {self.prefix}_{self.index2:05d}")
             else:
-                self.insert_text(f"[INFO] Loading the cropped DRP-reduced sky frame {self.prefix}_{self.index:05d} for {self.prefix}_{self.index:05d}")
+                self.insert_text(f"[INFO] Loading the cropped DRP-reduced sky frame {self.prefix}_{self.index2:05d} for {self.prefix}_{self.index:05d}")
             # self.plot_spectrum(self.scihdu[0].data, hdu_sky=self.skyhdu[0].data, 
             #                     yunit = self.scihdr['BUNIT']) #plot the spectrum of the central region (x = [12, 22], y = [43, 53]; 10x10 box) for a quick look. 
-            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data, 'z': 0.0,
-                                   'yunit': self.scihdr['BUNIT'], 'skycube': self.skyhdu[0].data}   
+            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data,
+                                    'flagcube': self.scihdu['FLAGS'].data, 
+                                    'z': 0.0,
+                                   'yunit': self.scihdr['BUNIT'], 'skycube': self.skyhdu[0].data}
+
+            #replace the bad pixels (flags >0) with NaNs
+            # self.skyhdu[0].data[self.skyhdu['FLAGS'].data > 0] = np.nan  
+            # self.skyhdu['UNCERT'].data[self.skyhdu['FLAGS'].data > 0] = np.nan 
+
+            
         else:
             self.skyhdu = None
             # self.plot_spectrum(self.scihdu[0].data, yunit = self.scihdr['BUNIT']) #plot the spectrum of the central region (x = [12, 22], y = [43, 53]; 10x10 box) for a quick look. 
-            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data, 'z': 0.0,
+            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data, 
+                                    'flagcube': self.scihdu['FLAGS'].data, 'z': 0.0,
                                    'yunit': self.scihdr['BUNIT'], 'skycube': None} 
 
         self.plot_spectrum(**self.plot_spec_dict)
@@ -763,7 +779,7 @@ class KCWIViewerApp:
         return hdu
 
 
-    def plot_spectrum(self, datacube, errcube, z = 0, xrange = [12, 22], yrange = [43, 53], skycube = None, restore_limit = False,
+    def plot_spectrum(self, datacube, errcube, flagcube, z = 0, xrange = [12, 22], yrange = [43, 53], skycube = None, restore_limit = False,
                       yunit = 'electron', unzapped_skycube = False, show_lines = False):
         """
         plot the spectrum of a given region for
@@ -784,13 +800,19 @@ class KCWIViewerApp:
 
         self.ax.clear()
 
-        spec = np.sum(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
-        err = np.sqrt(np.sum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2)))
+        datacube = datacube.copy()
+        errcube = errcube.copy()
+        datacube[flagcube > 0] = np.nan
+        errcube[flagcube > 0] = np.nan
+
+        spec = np.nansum(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+        err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2)))
         self.ax.step(self.obswave / (1+z), spec, color ='k', lw = 1, label = 'sci spec')
-        self.ax.step(self.obswave / (1+z), err, color ='lightgrey', lw = 1, label = 'sci err')
+        self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
+        self.ax.fill_between(self.obswave / (1+z), spec - err, spec + err, color = 'lightgrey', step = 'pre')
         
         if skycube is not None:
-            skyspec = np.sum(skycube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+            skyspec = np.nansum(skycube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
 
             # rescale it to the similar level
             if unzapped_skycube:
@@ -900,9 +922,10 @@ class KCWIViewerApp:
 
                 #multiple sky segment
                 if ';' in lines[0]:
-                    tuple_list = lines[0].split('; ')[:-1]
+                    tuple_list = lines[0].split(';')[:-1]
                     for t in tuple_list:
-                        start, end, width = t[1:-1].split(',')
+                        t = re.sub('[()]','',t)
+                        start, end, width = t.split(',')
                         #the first element
                         if len(skyseg) == 0:
                             skyseg.extend([int(start), int(end)])
@@ -1015,7 +1038,7 @@ class KCWIViewerApp:
             maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
                   mask = maskpath, interactive = True, 
-                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'])
+                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'sigclip')
 
         #Off-field sky
         if self.index2 > 0:
@@ -1033,7 +1056,7 @@ class KCWIViewerApp:
         #if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
         mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
         use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
+        skycube_clipped = sigma_clip(skycube[:,use], axis = 1, maxiters = 1)
 
         median_cube = np.zeros_like(skycube) #3D median cube
         std_cube = np.zeros_like(skycube) #3D STD cube
@@ -1114,8 +1137,17 @@ class KCWIViewerApp:
         hdulist = fits.HDUList([wlhdu, mhdu])
         hdulist.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zapclean_wlimg.fits', overwrite = True)
 
+        #TODO make the errcube_combined as the official cleanhdu_flux['UNCERT'].data
+        # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+        # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+        # skystd = np.std(self.cleanhdu_flux['SKYMODEL_ZAP'].data[:, use], axis = 1) #std in sky model of each wavelength slice
+        # errcube = self.cleanhdu_flux['UNCERT'].data.copy()
+        # errcube_combined = np.sqrt(errcube**2 + skystd[:, np.newaxis, np.newaxis]**2)
+
+
         #plot the spectrum
-        self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data, 
+        self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
+                                'flagcube': self.cleanhdu_flux['FLAGS'].data, 
                                 'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
                                 'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
                                 'restore_limit': False, 'show_lines': True}
