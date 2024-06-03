@@ -24,6 +24,9 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
 4. Set the `initial_dir` in the kcrm_viewer.py as your favorite data directory, or set it as None.
 
 ## Usage
-   
+
+Will be updated later.
  
-   
+## Contact
+
+If you encounter any problems or find bugs, please email [Zhuyun Zhuang](zzhuang@astro.caltech.edu).
