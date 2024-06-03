@@ -29,4 +29,4 @@ Will be updated later.
  
 ## Contact
 
-If you encounter any problems or find bugs, please email [Zhuyun Zhuang](zzhuang@astro.caltech.edu).
+If you encounter any problems or find bugs, please email [Zhuyun Zhuang](mailto:zzhuang@astro.caltech.edu).
