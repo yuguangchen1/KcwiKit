@@ -805,14 +805,14 @@ class KCWIViewerApp:
         datacube[flagcube > 0] = np.nan
         errcube[flagcube > 0] = np.nan
 
-        spec = np.nansum(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
-        err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2)))
+        spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+        err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2))) / np.sum(np.isfinite(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]), axis = (1,2))
         self.ax.step(self.obswave / (1+z), spec, color ='k', lw = 1, label = 'sci spec')
         self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
         self.ax.fill_between(self.obswave / (1+z), spec - err, spec + err, color = 'lightgrey', step = 'pre')
         
         if skycube is not None:
-            skyspec = np.nansum(skycube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+            skyspec = np.nanmean(skycube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
 
             # rescale it to the similar level
             if unzapped_skycube:
