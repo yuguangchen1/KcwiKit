@@ -75,7 +75,10 @@ def main(file, wavebin=None, use_pix=False):
                     
                     # Find wavelength range
                     if wavebin is None:
-                        wrange = [hdr['WAVGOOD0'], np.min((hdr['WAVGOOD1'], 5500))]
+                        if hdr['WAVGOOD0'] > 5500: # red channel
+			    wrange = [hdr['WAVGOOD0'], hdr['WAVGOOD1']]
+			else: # blue channel
+			    wrange = [hdr['WAVGOOD0'], np.min((hdr['WAVGOOD1'], 5500))]
                     else:
                         wrange = wavebin
 
