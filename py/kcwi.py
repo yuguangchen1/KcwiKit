@@ -2248,7 +2248,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
     conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
-    save_shift=False):
+    save_shift=False,interp_order='bilinear'):
 
     """
     Conduct astrometry correction of the stacked cube by cross-correlating the
@@ -2426,7 +2426,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
 
-                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
+                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order=interp_order)
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
 
@@ -2481,7 +2481,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
 
-                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
+                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order=interp_order)
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
 
