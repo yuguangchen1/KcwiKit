@@ -52,7 +52,8 @@ telgridfile = '/scr/zzhuang/telluric/TelFit_MaunaKea_3100_26100_R20000.fits'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
 # TODO: Can also make it as an input or variable parameter in the GUI
-wlimg_wave_range = [6380, 7200] 
+wlimg_wave_range_red = [6380, 7200] 
+wlimg_wave_range_blue = [3600, 5500] 
 
 
 
@@ -233,7 +234,7 @@ class KCWIViewerApp:
         Initialize the GUI window
         """
         self.root = root
-        self.root.title("KCRM Data Viewer")
+        self.root.title("KCWI Data Viewer")
         self.last_focused_entry = None
 
         # self.menu = tk.Menu(root)
@@ -610,7 +611,7 @@ class KCWIViewerApp:
         self.insert_text(f"[INFO] Loading the data from {self.base}")
 
         #find the common string name for a given date
-        self.prefix = os.path.basename(glob(f'{directory}/kr*.fits')[0])[:8]
+        self.prefix = os.path.basename(glob(f'{directory}/k*.fits')[0])[:8]
 
     def browse_output_directory(self):
         """Select the output directory"""
@@ -649,6 +650,12 @@ class KCWIViewerApp:
 
             self.scihdr = self.scihdu[0].header
             self.obswave = (np.arange(self.scihdr['NAXIS3']) + 1 - self.scihdr['CRPIX3']) * self.scihdr['CD3_3'] + self.scihdr['CRVAL3']
+            if self.obswave[-1] > wlimg_wave_range_red[0]:
+                self.wlimg_wave_range = wlimg_wave_range_red
+            else:
+                self.wlimg_wave_range = wlimg_wave_range_blue
+
+
 
             #replace the bad pixels (flags >0) with NaNs
             # self.scihdu[0].data[self.scihdu['FLAGS'].data > 0] = np.nan 
@@ -713,7 +720,7 @@ class KCWIViewerApp:
                 hdu.writeto(f'{self.output}/{self.prefix}_{index:05d}_{self.ctype}.fits', overwrite = True)
 
                 #white-lighted image
-                wlimg_index = np.where((self.obswave >= wlimg_wave_range[0]) & (self.obswave <= wlimg_wave_range[1]))[0]
+                wlimg_index = np.where((self.obswave >= self.wlimg_wave_range[0]) & (self.obswave <= self.wlimg_wave_range[1]))[0]
                 wlimg = np.sum(hdu[0].data[wlimg_index], axis = 0)
                 hdr2d = kcwi_tools.collapse_header(self.scihdu[0].header)
                 wlhdu = fits.PrimaryHDU(wlimg, header = hdr2d)
@@ -1126,12 +1133,12 @@ class KCWIViewerApp:
                 
 
         #save the white-lighted image of the clean cube
-        wlimg_index = np.where((self.obswave >= wlimg_wave_range[0]) & (self.obswave <= wlimg_wave_range[1]))[0]
+        wlimg_index = np.where((self.obswave >= self.wlimg_wave_range[0]) & (self.obswave <= self.wlimg_wave_range[1]))[0]
         wlimg = np.sum(self.cleanhdu_flux[0].data, axis = 0)
         hdr2d = kcwi_tools.collapse_header(self.cleanhdu_flux[0].header)
         wlhdu = fits.PrimaryHDU(wlimg, header = hdr2d)
-        wlhdu.header['WAVWLIMG0'] = wlimg_wave_range[0]
-        wlhdu.header['WAVWLIMG1'] = wlimg_wave_range[1]
+        wlhdu.header['WAVWLIMG0'] = self.wlimg_wave_range[0]
+        wlhdu.header['WAVWLIMG1'] = self.wlimg_wave_range[1]
         mask = np.mean(self.cleanhdu_flux['FLAGS'].data, axis = 0)
         mhdu = fits.ImageHDU(mask, header = hdr2d)
         hdulist = fits.HDUList([wlhdu, mhdu])
