@@ -19,7 +19,7 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
    The major difference between the official ZAP and the modified one is described in the Continuum Filter Widths and Wavelength Segments Section [here](https://github.com/jasonpeng17/zap_for_kcwi/blob/master/doc/index.rst).
 
 3. Download the telluric model grid via `pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits`. Update the `telgridfile` in the kcwi_viewer.py as
-   `telgridfile = your_path_of_telfit_file`
+   `telgridfile = your_path_of_telfit_file`. If you can't find the downloaded file, it is usually stored at ~/.pypeit/cache/download/url/*. The file `contents` is TelFit_MaunaKea_3100_26100_R20000.fits. Alternatively, you can directly download the file using the link in `url` in the same directory.  
 
 4. Set the `initial_dir` in the kcwi_viewer.py as your favorite data directory, or set it as None.
 
