@@ -679,6 +679,7 @@ class KCWIViewerApp:
                                     'flagcube': self.scihdu['FLAGS'].data, 
                                     'z': 0.0,
                                    'yunit': self.scihdr['BUNIT'], 'skycube': self.skyhdu[0].data}
+            
 
             #replace the bad pixels (flags >0) with NaNs
             # self.skyhdu[0].data[self.skyhdu['FLAGS'].data > 0] = np.nan  
@@ -707,6 +708,13 @@ class KCWIViewerApp:
             hdu_list.append(self.scihdu)
             indices.append(self.index)
         if self.index2 > 0:
+            
+            # #scale the sky spectrum if the exposure time between the science and sky doesn't match.
+            # scaling_factor = self.scihdr['XPOSURE'] / self.skyhdu[0].header['XPOSURE']
+            # self.skyhdu[0].data *= scaling_factor
+            # self.skyhdu[0].header['XPOSURE'] = self.scihdr['XPOSURE']
+            # self.insert_text(f"[INFO] Scale the sky cube by {scaling_factor:0.2f}")
+
             hdu_list.append(self.skyhdu)
             indices.append(self.index2)
         
@@ -878,8 +886,10 @@ class KCWIViewerApp:
                 skyseg0 = [0, 5400, 5850, 6440, 6750, 7200, 7700, 8265, 8602, 8731, 9275, 10000] 
                 #remove the extra sky segement falls outside of the spectral region in case ZAP runs into problem
                 skyseg0 = np.array(skyseg0)
-                idx_remove = np.where(skyseg0 < self.obswave[0])[0]
-                self._zap_skyseg = np.delete(skyseg0, idx_remove[1:]) #the first index is zero; need to keep
+                idx_remove_low = np.where(skyseg0 < self.obswave[0])[0]
+                idx_remove_up = np.where(skyseg0 > self.obswave[-1])[0]
+                idx_remove = np.concatenate((idx_remove_low[1:], idx_remove_up[1:]))
+                self._zap_skyseg = np.delete(skyseg0, idx_remove) #the first index is zero; need to keep
                 self._zap_skyseg = self._zap_skyseg.tolist()
                 self._zap_cfwidth = [300] * (len(self._zap_skyseg) - 1) #cfwidth = 300, default setting of ZAP
 
@@ -897,6 +907,8 @@ class KCWIViewerApp:
 
             self.zap['use_multi_skyseg'] = self.use_multi_skyseg.get()
             self.zap['use_Ha_seg'] = self.use_Ha_seg.get()
+
+        #TODO: add the line to indicate different sky segments
 
         #print the default sky segment                                                
         self.print_sky_seg(self.zap['skyseg'], self.zap['cfwidth'])
@@ -1040,7 +1052,7 @@ class KCWIViewerApp:
 
         #In-field sky:
         if self.index2 < 0:
-            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}__{self.index:05d}_zap_mask.fits')
+            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.index:05d}_zap_mask.fits')
             self.skyhdu = None
             maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
