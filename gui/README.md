@@ -23,6 +23,10 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
 
 4. Set the `initial_dir` in the kcwi_viewer.py as your favorite data directory, or set it as None.
 
+5. Install the entire KcwiKit package. To make it available in your Python file directly, please add its path to the PYTHONPATH environmental variable:
+
+   `export PYTHONPATH=${PYTHONPATH}:YOUR_PATH_OF_KCWIKIT/py`
+
 ## Usage
 
 ### 1. Run the GUI
