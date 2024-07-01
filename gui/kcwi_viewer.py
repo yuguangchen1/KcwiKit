@@ -1203,6 +1203,7 @@ class KCWIViewerApp:
             self.std['invsens_model_drp'] = hdu[0].data[1, good]
             self.std['counts'] = hdu[0].data[2, good]
             self.std['name'] = hdr['OBJECT'].lower()
+            self.std['name'] = re.sub('[\ _]', '', self.std['name'])
             self.std['frame'] = re.sub('_invsens.fits', '', os.path.basename(self.std_entry.get()))
             flag = np.full(len(self.std['wave']), 1, dtype = int)
             self.std['flag'] = self.mask_skyline_region(self.std['wave'], flag)
