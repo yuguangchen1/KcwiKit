@@ -709,11 +709,11 @@ class KCWIViewerApp:
             indices.append(self.index)
         if self.index2 > 0:
             
-            # #scale the sky spectrum if the exposure time between the science and sky doesn't match.
-            # scaling_factor = self.scihdr['XPOSURE'] / self.skyhdu[0].header['XPOSURE']
-            # self.skyhdu[0].data *= scaling_factor
-            # self.skyhdu[0].header['XPOSURE'] = self.scihdr['XPOSURE']
-            # self.insert_text(f"[INFO] Scale the sky cube by {scaling_factor:0.2f}")
+            #scale the sky spectrum if the exposure time between the science and sky doesn't match.
+            scaling_factor = self.scihdr['XPOSURE'] / self.skyhdu[0].header['XPOSURE']
+            self.skyhdu[0].data *= scaling_factor
+            self.skyhdu[0].header['XPOSURE'] = self.scihdr['XPOSURE']
+            self.insert_text(f"[INFO] Scale the sky cube by {scaling_factor:0.2f}")
 
             hdu_list.append(self.skyhdu)
             indices.append(self.index2)
