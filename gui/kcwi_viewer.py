@@ -817,10 +817,11 @@ class KCWIViewerApp:
 
         datacube = datacube.copy()
         errcube = errcube.copy()
-        datacube[flagcube > 0] = np.nan
-        errcube[flagcube > 0] = np.nan
+        # datacube[flagcube > 0] = np.nan
+        # errcube[flagcube > 0] = np.nan
 
-        spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+        # spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+        spec = np.mean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
         err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2))) / np.sum(np.isfinite(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]), axis = (1,2))
         self.ax.step(self.obswave / (1+z), spec, color ='k', lw = 1, label = 'sci spec')
         self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
@@ -1052,7 +1053,7 @@ class KCWIViewerApp:
 
         #In-field sky:
         if self.index2 < 0:
-            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.index:05d}_zap_mask.fits')
+            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.mindex:05d}_zap_mask.fits')
             self.skyhdu = None
             maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
