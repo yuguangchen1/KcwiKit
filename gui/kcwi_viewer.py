@@ -44,7 +44,7 @@ This version is still under development. If you run into any issue, please drop 
 """
 ####Some user-defined setup. People should update it based on their own needs######
 #only set it for test purporse. When it browse the directory, it will start from your favorite directory storing the data :)
-initial_dir = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/noskysub_drp'
+initial_dir = '/scr/zzhuang/keck_obs/kcwi'
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
@@ -839,7 +839,7 @@ class KCWIViewerApp:
 
             self.ax.step(self.obswave / (1+z), skyspec, color ='lightskyblue', lw = 1, label = label, alpha = 0.5)
         self.ax.legend()
-        self.ax.set_title(f'{self.prefix}_{self.index:05d}  -  {self.objname}')
+        self.ax.set_title(self.scihdr['OFNAME'] + f'  - {self.objname}')
         # self.figure.tight_layout()
         if np.abs(z) < 1e-10:
             self.ax.set_xlabel('Obs. Wavelength [A]')
