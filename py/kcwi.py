@@ -155,14 +155,14 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        tmp=np.array(ele[1:5]).astype(np.float)
+        tmp=np.array(ele[1:5]).astype(float)
         par['align_box']=np.array([tmp[0],tmp[2],tmp[1],tmp[3]]).astype(int)
 
     q=np.where(np.array(keys)=="align_dimension")[0]
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["align_dimension"]=np.array(ele[1:3]).astype(np.int)
+        par["align_dimension"]=np.array(ele[1:3]).astype(int)
 
     q=np.where(np.array(keys)=="align_xpix")[0]
     if len(q) > 0:
@@ -186,7 +186,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["align_ad"]=np.array(ele[1:3]).astype(np.float)
+        par["align_ad"]=np.array(ele[1:3]).astype(float)
 
     q=np.where(np.array(keys)=='align_search_size')[0]
     if len(q)>0:
@@ -212,7 +212,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["stack_dimension"]=np.array(ele[1:3]).astype(np.int)
+        par["stack_dimension"]=np.array(ele[1:3]).astype(int)
 
     q=np.where(np.array(keys)=="stack_xpix")[0]
     if len(q) > 0:
@@ -236,7 +236,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["stack_ad"]=np.array(ele[1:3]).astype(np.float)
+        par["stack_ad"]=np.array(ele[1:3]).astype(float)
 
 
     # Global keywords
@@ -244,8 +244,8 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["stack_dimension"]=np.array(ele[1:3]).astype(np.int)
-        par["align_dimension"]=np.array(ele[1:3]).astype(np.int)
+        par["stack_dimension"]=np.array(ele[1:3]).astype(int)
+        par["align_dimension"]=np.array(ele[1:3]).astype(int)
 
     q=np.where(np.array(keys)=="xpix")[0]
     if len(q) > 0:
@@ -272,14 +272,14 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) > 0:
         q=q[0]
         ele=lins[q].split()
-        par["stack_ad"]=np.array(ele[1:3]).astype(np.float)
-        par["align_ad"]=np.array(ele[1:3]).astype(np.float)
+        par["stack_ad"]=np.array(ele[1:3]).astype(float)
+        par["align_ad"]=np.array(ele[1:3]).astype(float)
 
     q = np.where(np.array(keys)=='wave_ref')[0]
     if len(q) > 0:
         q = q[0]
         ele = lins[q].split()
-        par['wave_ref'] = np.array(ele[1:3]).astype(np.float)
+        par['wave_ref'] = np.array(ele[1:3]).astype(float)
 
     q = np.where(np.array(keys)=='nwave')[0]
     if len(q) > 0:
@@ -320,20 +320,20 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q) >0:
         q=q[0]
         ele=lins[q].split()
-        par["wavebin"]=np.array(ele[1:3]).astype(np.float)
+        par["wavebin"]=np.array(ele[1:3]).astype(float)
 
     # astrometry
     q=np.where(np.array(keys)=="ref_xy")[0]
     if len(q) >0:
         q=q[0]
         ele=lins[q].split()
-        par["ref_xy"]=np.array(ele[1:3]).astype(np.float)
+        par["ref_xy"]=np.array(ele[1:3]).astype(float)
 
     q=np.where(np.array(keys)=="ref_ad")[0]
     if len(q) >0:
         q=q[0]
         ele=lins[q].split()
-        par["ref_ad"]=np.array(ele[1:3]).astype(np.float)
+        par["ref_ad"]=np.array(ele[1:3]).astype(float)
 
     q=np.where(np.array(keys)=='ref_fn')[0]
     if len(q)>0:
@@ -363,7 +363,7 @@ def kcwi_stack_readpar(parname='q0100-bx172.par'):
     if len(q)>0:
         q=q[0]
         ele=lins[q].split()
-        tmp=np.array(ele[1:5]).astype(np.float)
+        tmp=np.array(ele[1:5]).astype(float)
         par['ref_box']=np.array([tmp[0],tmp[2],tmp[1],tmp[3]]).astype(int)
 
     q=np.where(np.array(keys)=='ref_nocrl')[0]
@@ -2248,7 +2248,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
     conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
-    save_shift=False):
+    save_shift=False,interp_order='bilinear'):
 
     """
     Conduct astrometry correction of the stacked cube by cross-correlating the
@@ -2426,7 +2426,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
 
-                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
+                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order=interp_order)
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
 
@@ -2481,7 +2481,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
                 hdr_shift['CRPIX1']=hdr_img['CRPIX1']+dx[ii,jj]
                 hdr_shift['CRPIX2']=hdr_img['CRPIX2']+dy[ii,jj]
 
-                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order='bilinear')
+                img0_shift,coverage=reproject_interp((img0.T,hdr0),hdr_shift,order=interp_order)
                 img0_shift=img0_shift.T
                 img0_shift=np.nan_to_num(img0_shift)
 
