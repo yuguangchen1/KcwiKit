@@ -31,6 +31,12 @@ from pypeit.spectrographs.util import load_spectrograph
 import zap
 
 
+#DRP required package
+from scipy.ndimage import shift
+import math
+import ref_index
+
+
 
 """
 Author: Zhuyun Zhuang, with the help from chatGPT! (free version!)
@@ -44,7 +50,8 @@ This version is still under development. If you run into any issue, please drop 
 """
 ####Some user-defined setup. People should update it based on their own needs######
 #only set it for test purporse. When it browse the directory, it will start from your favorite directory storing the data :)
-initial_dir = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/noskysub_drp'
+# initial_dir = '/scr/zzhuang/keck_obs/kcwi'
+initial_dir = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux'
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
@@ -54,6 +61,11 @@ telgridfile = '/scr/zzhuang/telluric/TelFit_MaunaKea_3100_26100_R20000.fits'
 # TODO: Can also make it as an input or variable parameter in the GUI
 wlimg_wave_range_red = [6380, 7200] 
 wlimg_wave_range_blue = [3600, 5500] 
+
+#the reference wavelength for DAR correction, set it to be the one used for M_BL_4500 to avoid second alignment. 
+# If you don't want to use the function, please set it to None
+DAR_ref_wave = 4577.858334891979
+DAR_shift_order = 1
 
 
 
@@ -227,6 +239,35 @@ def reassign_skyseg(x_segments, widths, new_segment, new_width, min_span = 100):
         final_x_segments.append(end)
 
     return final_x_segments, final_widths
+
+
+def atm_disper(w0, w1, airmass, temperature=10.0, pressure_pa=61100.0,
+               humidity=50.0, co2=400.0):
+    """
+
+    Calculate atmospheric dispersion at w1 relative to w0 [Copied from KCWI_DRP, put it here to avoid re-running the DRP...]
+
+    Args:
+        w0 (float): reference wavelength (Angstroms)
+        w1 (float): offset wavelength (Angstroms)
+        airmass (float): unitless airmass
+        temperature (float): atmospheric temperature (C)
+        pressure_pa (float): atmospheric pressure (Pa)
+        humidity (float): relative humidity (%)
+        co2 (float): Carbon-Dioxide (mu-mole/mole)
+
+    """
+
+    # Calculate
+    z = math.acos(1.0/airmass)
+
+    n0 = ref_index.ciddor(wave=w0/10., t=temperature, p=pressure_pa,
+                          rh=humidity, co2=co2)
+    n1 = ref_index.ciddor(wave=w1/10., t=temperature, p=pressure_pa,
+                          rh=humidity, co2=co2)
+
+    return 206265.0 * (n0 - n1) * math.tan(z)
+
         
 class KCWIViewerApp:
     def __init__(self, root):
@@ -314,7 +355,7 @@ class KCWIViewerApp:
         # self.structure_label = tk.Label(root, text="Science Data Product type:")
         # self.structure_label.grid(row=2, column=0)
         self.structure_var = tk.StringVar()
-        self.structure_options = ["icubed", "icubes"]
+        self.structure_options = ["icubed", "icube", "icubes"]
         self.structure_var.set('icubed')
         self.structure_menu = tk.OptionMenu(root, self.structure_var, *self.structure_options)
         self.structure_menu.grid(row=3, column=0)
@@ -771,13 +812,13 @@ class KCWIViewerApp:
             maskhdu = fits.PrimaryHDU(allmask, header = mhdu[0].header)
 
             #save ZAP mask
-            filename = f'{self.output}/{self.prefix}_{self.index:05d}_zap_mask.fits'
+            filename = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             if os.path.exists(filename):
                 confirm = messagebox.askyesno("File Exists",
-                                              f'ZAP mask {self.prefix}_{self.index:05d}_zap_mask.fits already exists. Do you want to overwrite it?')
+                                              f'ZAP mask {self.prefix}_{self.mindex:05d}_zap_mask.fits already exists. Do you want to overwrite it?')
                 if not confirm:
                     return
-            self.insert_text(f"[INFO] Saving ZAP mask to {self.prefix}_{self.index:05d}_zap_mask.fits")
+            self.insert_text(f"[INFO] Saving ZAP mask to {self.prefix}_{self.mindex:05d}_zap_mask.fits")
             maskhdu.writeto(filename, overwrite = True)
 
     
@@ -839,7 +880,7 @@ class KCWIViewerApp:
 
             self.ax.step(self.obswave / (1+z), skyspec, color ='lightskyblue', lw = 1, label = label, alpha = 0.5)
         self.ax.legend()
-        self.ax.set_title(f'{self.prefix}_{self.index:05d}  -  {self.objname}')
+        self.ax.set_title(self.scihdr['OFNAME'] + f'  - {self.objname}')
         # self.figure.tight_layout()
         if np.abs(z) < 1e-10:
             self.ax.set_xlabel('Obs. Wavelength [A]')
@@ -1045,6 +1086,7 @@ class KCWIViewerApp:
 
         try:
             self.scihdu = fits.open(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits')
+            self.scihdr = self.scihdu[0].header
         except FileNotFoundError:
             self.insert_text(f'[ERROR] Cropped data cubes not exist! Load the raw DRP-reduced cubes and save the cropped cubes first!')
             return
@@ -1058,7 +1100,7 @@ class KCWIViewerApp:
             maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
                   mask = maskpath, interactive = True, 
-                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'sigclip')
+                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
 
         #Off-field sky
         if self.index2 > 0:
@@ -1072,20 +1114,36 @@ class KCWIViewerApp:
                   cfwidthSP = self.zap['cfwidth'], 
                    skyseg = self.zap['skyseg'])
 
-        skycube = zobj.cube - zobj.cleancube
-        #if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
+        nsig = 3
+        # skycube = zobj.cube - zobj.cleancube
+        # ### if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
+        # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+        # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+        # skycube_clipped = sigma_clip(skycube[:,use], sigma = nsig, axis = 1)
+        # # skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
+
+        # median_cube = np.zeros_like(skycube) #3D median cube
+        # std_cube = np.zeros_like(skycube) #3D STD cube
+        # npix = np.sum(use)
+        # median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+        # std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+        # #find and replace the 3sigma outlier
+        # bpm = np.where((np.abs(skycube - median_cube) > nsig*std_cube) & (median_cube > 0))
+        # # bpm = np.where(np.abs(skycube - median_cube) > nsig*std_cube)
+        # skycube[bpm] = median_cube[bpm]
+        # cleancube = zobj.cube - skycube
+
+        skycube0 = zobj.cube - zobj.cleancube
+        skycube = skycube0.copy()
+
         mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
         use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        skycube_clipped = sigma_clip(skycube[:,use], axis = 1, maxiters = 1)
-
-        median_cube = np.zeros_like(skycube) #3D median cube
-        std_cube = np.zeros_like(skycube) #3D STD cube
-        npix = np.sum(use)
-        median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        #find and replace the 3sigma outlier
-        bpm = np.where((np.abs(skycube - median_cube) > 3*std_cube) & (np.abs(median_cube) > 1e-10))
-        skycube[bpm] = median_cube[bpm]
+        skycube[:,~use] = np.nan
+        skycube_clipped = sigma_clip(skycube, sigma = nsig, axis = (1,2))
+        median_sky = np.ma.median(skycube_clipped, axis = (1,2)).data
+        median_cube = median_sky[:, np.newaxis, np.newaxis] * np.ones((1, np.shape(skycube)[1], np.shape(skycube)[2]))
+        skycube[skycube_clipped.mask] = median_cube[skycube_clipped.mask]
+        skycube[:, ~use] = skycube0[:, ~use]
         cleancube = zobj.cube - skycube
 
         # save the output cube
@@ -1093,10 +1151,187 @@ class KCWIViewerApp:
         self.cleanhdu.append(self.scihdu[0])
         self.cleanhdu[-1].name = 'UNZAPPED'
         self.cleanhdu[0].data = cleancube
+        # bad = np.where(self.cleanhdu['FLAGS'].data >=8)
+        # self.cleanhdu[0].data[bad] = 0
         skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
         skyhdu.name = 'SKYMODEL_ZAP'
         self.cleanhdu.append(skyhdu)
         self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
+
+        #Need to run the DAR correction for the unrectified cube
+        if self.ctype == 'icube':
+
+            self.insert_text(f'[INFO] Correcting for DAR!')
+            image_size = self.cleanhdu[0].data.shape
+
+            # get wavelengths
+            w0 = self.scihdr['CRVAL3']
+            dw = self.scihdr['CD3_3']
+            waves = w0 + np.arange(image_size[0]) * dw
+            wgoo0 = self.scihdr['WAVGOOD0']
+            wgoo1 = self.scihdr['WAVGOOD1']
+            if DAR_ref_wave is None: 
+                wref = self.scihdr['WAVMID']
+            else:
+                wref = DAR_ref_wave
+            self.insert_text("Ref WL = %.1f, good WL range = (%.1f - %.1f)" %
+                            (wref, wgoo0, wgoo1))
+            
+            # spatial scales in arcsec/item
+            y_scale = self.scihdr['PXSCL'] * 3600.
+            x_scale = self.scihdr['SLSCL'] * 3600.
+
+            # padding depends on grating
+            if 'H' in self.scihdr['RGRATNAM']:
+                padding_as = 2.0
+            elif 'M' in self.scihdr['RGRATNAM']:
+                padding_as = 3.0
+            else:
+                padding_as = 4.0
+
+            padding_x = int(padding_as / x_scale)
+            padding_y = int(padding_as / y_scale)
+
+            # update WCS
+            crpix1 = self.scihdr['CRPIX1']
+            crpix2 = self.scihdr['CRPIX2']
+            self.scihdr['CRPIX1'] = crpix1 + float(padding_x)
+            self.scihdr['CRPIX2'] = crpix2 + float(padding_y)
+
+            # airmass
+            airmass = self.scihdr['AIRMASS']
+            self.insert_text("Airmass: %.3f" % airmass)
+
+            # IFU orientation
+            ifu_pa = self.scihdr['IFUPA']
+
+            # Parallactic angle
+            parallactic_angle = self.scihdr['PARANG']
+
+            # Projection angle in radians
+            projection_angle_deg = ifu_pa - parallactic_angle
+            projection_angle = math.radians(projection_angle_deg)
+
+            self.insert_text("DAR Angles: ifu_pa, parang, projang (deg): "
+                         "%.2f, %.2f, %.2f" % (ifu_pa, parallactic_angle,
+                                               projection_angle_deg))
+            
+             # dispersion over goo wl range in arcsec
+            dispersion_max_as = atm_disper(wgoo1, wgoo0, airmass)
+
+            # projected onto IFU
+            xdmax_as = dispersion_max_as * math.sin(projection_angle)
+            ydmax_as = dispersion_max_as * math.cos(projection_angle)
+            self.insert_text("DAR over GOOD WL range: total, x, y (asec): "
+                            "%.2f, %.2f, %.2f" % (dispersion_max_as, xdmax_as,
+                                                ydmax_as))
+            # now in pixels
+            xdmax_px = xdmax_as / x_scale
+            ydmax_px = ydmax_as / y_scale
+            dmax_px = math.sqrt(xdmax_px**2 + ydmax_px**2)
+            self.insert_text("DAR over GOOD WL range: total, x, y (pix): "
+                            "%.2f, %.2f, %.2f" % (dmax_px, xdmax_px, ydmax_px))
+            
+            # prepare output cubes
+            output_image = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                    image_size[2]+2*padding_x), dtype=np.float64)
+            output_stddev = output_image.copy()
+            output_mask = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                    image_size[2]+2*padding_x), dtype=np.uint8)
+            output_flags = np.zeros((image_size[0], image_size[1] + 2*padding_y,
+                                    image_size[2] + 2 * padding_x), dtype=np.uint8)
+            output_skymodel_zap = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                    image_size[2]+2*padding_x), dtype=np.float64)
+            output_unzapped = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                    image_size[2]+2*padding_x), dtype=np.float64)
+            
+            if 'NOSKYSUB' in [hdu.name for hdu in self.cleanhdu]:
+                output_noskysub = np.zeros((image_size[0],
+                                            image_size[1] + 2*padding_y,
+                                            image_size[2] + 2 * padding_x),
+                                        dtype=np.float64)
+            else:
+                output_noskysub = None
+
+            # DAR padded pixel flag
+            output_flags += 128
+
+            output_image[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu[0].data
+
+            output_stddev[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNCERT'].data
+
+            output_mask[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['MASK'].data
+
+            output_flags[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['FLAGS'].data
+            
+            output_unzapped[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNZAPPED'].data
+            
+            output_skymodel_zap[:, padding_y:(padding_y+image_size[1]),
+                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['SKYMODEL_ZAP'].data
+            
+            if output_noskysub is not None:
+                output_noskysub[:, padding_y:(padding_y + image_size[1]),
+                                padding_x:(padding_x + image_size[2])] = self.cleanhdu['NOSKYSUB'].data
+                
+            self.insert_text(f"Image cube DAR order = {DAR_shift_order}")
+            self.insert_text(f"Std. Dev. cube DAR order = {DAR_shift_order}")
+            self.insert_text(f"Mask cube DAR order = 1 (constant)")
+            self.insert_text(f"Flag cube DAR order = 1 (constant)")
+            # Perform correction
+            for j, wl in enumerate(waves):
+                dispersion_correction = atm_disper(wref, wl, airmass)
+                x_shift = dispersion_correction * \
+                    math.sin(projection_angle) / x_scale
+                y_shift = dispersion_correction * \
+                    math.cos(projection_angle) / y_scale
+                output_image[j, :, :] = shift(output_image[j, :, :],
+                                            (y_shift, x_shift), order = DAR_shift_order)
+                output_stddev[j, :, :] = shift(output_stddev[j, :, :],
+                                            (y_shift, x_shift))
+                output_mask[j, :, :] = np.ceil(shift(output_mask[j, :, :], (y_shift,
+                                                                x_shift), order=1, mode = 'constant', cval=128))
+                output_flags[j, :, :] = np.ceil(shift(output_flags[j, :, :], (y_shift,
+                                                                  x_shift), order=1, mode = 'constant', cval=128))
+                output_unzapped[j, :, :] = shift(output_unzapped[j, :, :],
+                                            (y_shift, x_shift), order = DAR_shift_order)
+                output_skymodel_zap[j, :, :] = shift(output_skymodel_zap[j, :, :],
+                                            (y_shift, x_shift), order = DAR_shift_order)
+                if output_noskysub is not None:
+                    output_noskysub[j, :, :] = shift(output_noskysub[j, :, :],
+                                                    (y_shift, x_shift), order = DAR_shift_order)
+                    
+            #update the data
+            self.cleanhdu[0].data = output_image
+            self.cleanhdu['UNCERT'].data = output_stddev
+            self.cleanhdu['MASK'].data = output_mask
+            self.cleanhdu['FLAGS'].data = output_flags
+            self.cleanhdu['UNZAPPED'].data = output_unzapped
+            self.cleanhdu['SKYMODEL_ZAP'].data = output_skymodel_zap
+
+            if output_noskysub is not None:
+                self.cleanhdu['NOSKYSUB'].data = output_noskysub
+
+            # update header
+            self.scihdr['DARCOR'] = (True, 'DAR corrected?')
+            self.scihdr['DARANG'] = (projection_angle_deg,
+                                                        'DAR projection angle '
+                                                        '(deg)')
+            self.scihdr['DARPADX'] = (padding_x,
+                                                        'DAR X padding (pix)')
+            self.scihdr['DARPADY'] = (padding_y,
+                                                        'DAR Y padding (pix)')
+            self.scihdr['DAREFWL'] = (wref, 'DAR reference wl (Ang)')
+
+            self.cleanhdu[0].header = self.scihdr
+
+            self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_icubed.fits', overwrite = True)
+
+                    
 
         #no available std
         if not hasattr(self, 'std'):
