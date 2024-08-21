@@ -167,8 +167,14 @@ def kcwi_medfilter_actonone(args, par):
         # Gather cubes
         cube0 = cube.copy()
         shape = cube.shape
-        mcube = hdl['MASK'].data.copy()
-        fcube = hdl['FLAGS'].data.copy()
+        if len(hdl) > 1:
+            # python DRP
+            mcube = hdl['MASK'].data.copy()
+            fcube = hdl['FLAGS'].data.copy()
+        else:
+            # IDL DRP
+            mcube = fits.open(cubefn.replace('icube', 'mcube'))[0].data.copy()
+            fcube = mcube
 
         # interpolation flag
         flagcube = np.zeros_like(cube0, dtype=int)
