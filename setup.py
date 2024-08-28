@@ -53,7 +53,6 @@ setuptools.setup(name=NAME,
         'argparse',
         'matplotlib',
         'numpy',
-        'PyQt5',
         'scipy']
 )
 
