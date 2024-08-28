@@ -1,5 +1,6 @@
 #package for GUI setup
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox
 from tkinter import scrolledtext
 import matplotlib.pyplot as plt
@@ -18,6 +19,7 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.stats import sigma_clip
 import os 
+sys.path.insert(1, '/Users/yuguangchen/Softs/KCWIKit/KcwiKit/py/')
 import kcwi_tools 
 import pyregion
 import re
@@ -51,11 +53,11 @@ This version is still under development. If you run into any issue, please drop 
 ####Some user-defined setup. People should update it based on their own needs######
 #only set it for test purporse. When it browse the directory, it will start from your favorite directory storing the data :)
 # initial_dir = '/scr/zzhuang/keck_obs/kcwi'
-initial_dir = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux'
+initial_dir = '/Volumes/obs-data/obs/2024feb11/kred_test/redux'
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
-telgridfile = '/scr/zzhuang/telluric/TelFit_MaunaKea_3100_26100_R20000.fits'
+telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
 # TODO: Can also make it as an input or variable parameter in the GUI
@@ -278,77 +280,106 @@ class KCWIViewerApp:
         self.root.title("KCWI Data Viewer")
         self.last_focused_entry = None
 
-        # self.menu = tk.Menu(root)
-        # root.config(menu=self.menu)
+        # Create a custom style
+        style = ttk.Style()
 
-        # ############## Add a menu ###########
-        # self.file_menu = tk.Menu(self.menu, tearoff=0)
-        # self.menu.add_cascade(label="File", menu=self.file_menu)
+        # Create a new style for the Notebook tabs
+        style.configure('TNotebook.Tab', font=('Helvetica', '10', 'bold'), padding=[10, 4])
 
-        # self.file_menu.add_command(label="input directory", command=self.browse_input_directory)
-        # self.file_menu.add_command(label="output directory", command=self.browse_output_directory)
-
-
-        # self.menubar = tk.Menu(root)
-        # self.filemenu = tk.Menu(self.menubar, tearoff = 0)
-        # self.filemenu.add_command(label = 'input directory', command = self.browse_input_directory)
-        # self.filemenu.add_command(label = 'output directory', command = self.browse_output_directory)
+        # Ensure the selected tab has a different foreground color
+        style.map('TNotebook.Tab',
+                foreground=[('selected', 'black')],
+                background=[('selected', 'lightgrey')])
 
         ############ Input directory #################
-        self.input_dir_label = tk.Label(root, text="Input Directory:")
-        self.input_dir_label.grid(row=0, column=0)
-        self.input_dir_entry = tk.Entry(root)
-        self.input_dir_entry.grid(row=0, column=1)
-        self.browse_button = tk.Button(root, text="Browse", command=self.browse_input_directory)
-        self.browse_button.grid(row=0, column=2)
+        self.input_frame = tk.Frame(root)
+        self.input_frame.grid(row=0, column=0, columnspan=3, sticky='nsew', padx=5, pady=5)
+
+        self.input_dir_label = tk.Label(self.input_frame, text="Input Directory:")
+        self.input_dir_label.grid(row=0, column=0, sticky='ew')
+        self.input_dir_entry = tk.Entry(self.input_frame)
+        self.input_dir_entry.grid(row=0, column=1, sticky='ew')
+        self.browse_button = tk.Button(self.input_frame, text="Browse", command=self.browse_input_directory)
+        self.browse_button.grid(row=0, column=2, sticky='ew')
 
         ############# Output directory############
-        self.output_dir_label = tk.Label(root, text="Output Directory:")
-        self.output_dir_label.grid(row=0, column=3)
-        self.output_dir_entry = tk.Entry(root)
-        self.output_dir_entry.grid(row=0, column=4)
-        self.browse_button = tk.Button(root, text="Browse", command=self.browse_output_directory)
-        self.browse_button.grid(row=0, column=5)
+        self.output_frame = tk.Frame(root)
+        self.output_frame.grid(row=0, column=3, columnspan=3, sticky='nsew', padx=5, pady=5)
 
+        self.output_dir_label = tk.Label(self.output_frame, text="Output Directory:")
+        self.output_dir_label.grid(row=0, column=0, sticky='ew')
+        self.output_dir_entry = tk.Entry(self.output_frame)
+        self.output_dir_entry.grid(row=0, column=1, sticky='ew')
+        self.browse_button = tk.Button(self.output_frame, text="Browse", command=self.browse_output_directory)
+        self.browse_button.grid(row=0, column=2, sticky='ew')
+
+        self.input_frame.columnconfigure(0, weight=1)
+        self.input_frame.columnconfigure(1, weight=1)
+        self.input_frame.columnconfigure(2, weight=1)
+        self.output_frame.columnconfigure(0, weight=1)
+        self.output_frame.columnconfigure(1, weight=1)
+        self.output_frame.columnconfigure(2, weight=1)
+
+        # Create a Notebook widget (for tabs)
+        self.notebook = ttk.Notebook(root, style='TNotebook')
+        self.notebook.grid(row=1, column=0, columnspan=6, sticky="nsew")
+
+        # Create two frames to hold the content of each tab
+        self.tab1 = ttk.Frame(self.notebook)
+        self.tab2 = ttk.Frame(self.notebook)
+
+        # Add the tabs to the notebook
+        self.notebook.add(self.tab1, text="Invsens")
+        self.notebook.add(self.tab2, text="Science")
+        
+        
+        ###### tab 1 #####
         ############# Setup the flux calibration part for stds ###############
         self.stddir = re.sub('py/kcwi_tools.py', 'data/stds', kcwi_tools.__file__)  #the base directory to read in the flux-calibrated spectrum of a given std
-        self.std_index_label = tk.Label(root, text="Standard star invsens (DRP): ")
-        self.std_index_label.grid(row = 1, column = 0)
-        self.std_entry = tk.Entry(root)
-        self.std_entry.grid(row = 1, column = 1)
-        self.load_std_button = tk.Button(root, text = 'Browse DRP invsens', command = lambda: self.load_invsens('DRP'))
-        self.load_std_button.grid(row = 1, column = 2)
-        self.load_std_update_button = tk.Button(root, text = 'Browse updated invsens', command = lambda: self.load_invsens('updated'))
-        self.load_std_update_button.grid(row = 1, column = 3)
-        self.save_std_button = tk.Button(root, text = 'Save updated invsens', command = self.save_updated_invsens)
-        self.save_std_button.grid(row = 1, column = 4)
+        self.std_index_label = tk.Label(self.tab1, text="Standard star invsens (DRP): ")
+        self.std_index_label.grid(row = 1, column = 0, sticky='ew')
+        self.std_entry = tk.Entry(self.tab1)
+        self.std_entry.grid(row = 1, column = 1, sticky='ew')
+        self.load_std_button = tk.Button(self.tab1, text = 'Browse DRP invsens', command = lambda: self.load_invsens('DRP'))
+        self.load_std_button.grid(row = 1, column = 2, sticky='ew')
+        self.load_std_update_button = tk.Button(self.tab1, text = 'Browse updated invsens', command = lambda: self.load_invsens('updated'))
+        self.load_std_update_button.grid(row = 1, column = 3, sticky='ew')
+        self.save_std_button = tk.Button(self.tab1, text = 'Save updated invsens', command = self.save_updated_invsens)
+        self.save_std_button.grid(row = 1, column = 4, sticky='ew')
         # self.std_bspline = tk.Label(root, text = 'B-Spline pars [breakpoints, polyorder]:')
         # self.std_bspline.grid(row = 4, column = 3)
         # self.std_bspline_entry = tk.Entry(root)
         # self.std_bspline_entry.grid(row = 4, column = 5)
         # self.std_bspline_entry.bind("<Return>", self.update_bspline_pars)
 
+        self.tab1.columnconfigure(0, weight=1)
+        self.tab1.columnconfigure(1, weight=1)
+        self.tab1.columnconfigure(2, weight=1)
+        self.tab1.columnconfigure(3, weight=1)
+        self.tab1.columnconfigure(4, weight=1)
+
+        ######## tab 2 #############
         ############# Science index input############
-        self.index_label = tk.Label(root, text="Science Frame No.:")
-        self.index_label.grid(row=2, column=0)
-        self.index_entry = tk.Entry(root)
-        self.index_entry.grid(row=2, column=1)
+        self.index_label = tk.Label(self.tab2, text="Science Frame No.:")
+        self.index_label.grid(row=2, column=0, sticky='ew')
+        self.index_entry = tk.Entry(self.tab2)
+        self.index_entry.grid(row=2, column=1, sticky='ew')
         self.index_entry.bind("<Return>", self.update_index)
 
         ############# Buttons for increasing and decreasing index for science frame############
-        self.increase_button = tk.Button(root, text="Previous", command=self.decrease_index)
-        self.increase_button.grid(row=2, column=2)
-        self.decrease_button = tk.Button(root, text="Next", command=self.increase_index)
-        self.decrease_button.grid(row=2, column=3)
+        self.increase_button = tk.Button(self.tab2, text="Previous", command=self.decrease_index)
+        self.increase_button.grid(row=2, column=2, sticky='ew')
+        self.decrease_button = tk.Button(self.tab2, text="Next", command=self.increase_index)
+        self.decrease_button.grid(row=2, column=3, sticky='ew')
 
         #############Check box to select whether an off-field sky is used############
         self.use_index2_var = tk.BooleanVar()
-        self.use_index2_checkbox = tk.Checkbutton(root, text="Use Off-field Sky Frame No.", variable=self.use_index2_var, command=self.toggle_index2_entry)
-        self.use_index2_checkbox.grid(row=2, column=4)
+        self.use_index2_checkbox = tk.Checkbutton(self.tab2, text="Use Off-field Sky Frame No.", variable=self.use_index2_var, command=self.toggle_index2_entry)
+        self.use_index2_checkbox.grid(row=2, column=4, sticky='ew')
 
         ############# sky index input############
-        self.index2_entry = tk.Entry(root)
-        self.index2_entry.grid(row=2, column=5)
+        self.index2_entry = tk.Entry(self.tab2)
+        self.index2_entry.grid(row=2, column=5, sticky='ew')
         self.index2_entry.bind("<Return>", self.update_index2)
 
         ############# Naming structure selection - used for loading the data cube for science data
@@ -357,59 +388,71 @@ class KCWIViewerApp:
         self.structure_var = tk.StringVar()
         self.structure_options = ["icubed", "icube", "icubes"]
         self.structure_var.set('icubed')
-        self.structure_menu = tk.OptionMenu(root, self.structure_var, *self.structure_options)
-        self.structure_menu.grid(row=3, column=0)
+        self.structure_menu = tk.OptionMenu(self.tab2, self.structure_var, *self.structure_options)
+        self.structure_menu.grid(row=3, column=0, sticky='ew')
 
 
         #############  Load raw data (DRP-reduced cube) button############
-        self.load_button = tk.Button(root, text="Load Raw Cube", command=lambda: self.load_data('raw'))
-        self.load_button.grid(row=3, column=1)
+        self.load_button = tk.Button(self.tab2, text="Load Raw Cube", command=lambda: self.load_data('raw'))
+        self.load_button.grid(row=3, column=1, sticky='ew')
 
         #############  Save cropped data (good wavelength region) button############
-        self.load_button = tk.Button(root, text="Save Cropped Cube", command=self.save_cropped_data)
-        self.load_button.grid(row=3, column=2)
+        self.load_button = tk.Button(self.tab2, text="Save Cropped Cube", command=self.save_cropped_data)
+        self.load_button.grid(row=3, column=2, sticky='ew')
 
         ############# Load cropped data button############
-        self.load_crop_button = tk.Button(root, text="Load Cropped Cube", command=lambda: self.load_data('cropped'))
-        self.load_crop_button.grid(row=3, column=3)
+        self.load_crop_button = tk.Button(self.tab2, text="Load Cropped Cube", command=lambda: self.load_data('cropped'))
+        self.load_crop_button.grid(row=3, column=3, sticky='ew')
 
         ############# input the redshift of a given source #########
-        self.redshift_label = tk.Label(root, text = 'Redshift:')
-        self.redshift_label.grid(row = 3, column =4)
-        self.redshift_entry = tk.Entry(root)
-        self.redshift_entry.grid(row = 3, column = 5)
+        self.redshift_label = tk.Label(self.tab2, text = 'Redshift:')
+        self.redshift_label.grid(row = 3, column =4, sticky='ew')
+        self.redshift_entry = tk.Entry(self.tab2)
+        self.redshift_entry.grid(row = 3, column = 5, sticky='ew')
         self.redshift_entry.bind("<Return>", self.update_redshift)
 
 
         ############# Input the mask frame No. (can be different from the science one since we usally take the at least three frames) ############
         # This function is only used for convenience, so that for each pair we only need to create one 
-        self.mask_index_label = tk.Label(root, text="ZAP Mask Frame No.:")
-        self.mask_index_label.grid(row=4, column=0)
-        self.mask_entry = tk.Entry(root)
-        self.mask_entry.grid(row = 4, column=1)
+        self.mask_index_label = tk.Label(self.tab2, text="ZAP Mask Frame No.:")
+        self.mask_index_label.grid(row=4, column=0, sticky='ew')
+        self.mask_entry = tk.Entry(self.tab2)
+        self.mask_entry.grid(row = 4, column=1, sticky='ew')
         self.mask_entry.bind("<Return>", self.update_mindex)
-        self.update_mask_button = tk.Button(root, text = 'Update ZAP mask', command=self.update_zap_mask)
-        self.update_mask_button.grid(row = 4, column = 2)
+        self.update_mask_button = tk.Button(self.tab2, text = 'Update ZAP mask', command=self.update_zap_mask)
+        self.update_mask_button.grid(row = 4, column = 2, sticky='ew')
 
         #############Check box to select whether multiple skysegment used, and whether have an additional sky seg near Halpha############
         self.use_multi_skyseg = tk.BooleanVar()
-        self.use_multi_skyseg_checkbox = tk.Checkbutton(root, text="Use multiple skyseg in ZAP", variable=self.use_multi_skyseg, 
+        self.use_multi_skyseg_checkbox = tk.Checkbutton(self.tab2, text="Use multiple skyseg in ZAP", variable=self.use_multi_skyseg, 
                                                         onvalue = True, offvalue = False)
-        self.use_multi_skyseg_checkbox.grid(row=4, column=3)
+        self.use_multi_skyseg_checkbox.grid(row=4, column=3, sticky='ew')
         self.use_multi_skyseg.set(True)
         self.use_Ha_seg = tk.BooleanVar()
-        self.use_Ha_seg_checkbox = tk.Checkbutton(root, text='Additional Sky Seg near Halpha', variable=self.use_Ha_seg,
+        self.use_Ha_seg_checkbox = tk.Checkbutton(self.tab2, text='Additional Sky Seg near Halpha', variable=self.use_Ha_seg,
                                                   onvalue = True, offvalue = False)
-        self.use_Ha_seg_checkbox.grid(row = 4, column = 4)
+        self.use_Ha_seg_checkbox.grid(row = 4, column = 4, sticky='ew')
         self.use_Ha_seg.set(True)
 
 
         #############Run button for the ZAP ############
-        self.run_zap_button = tk.Button(root, text = 'Run ZAP', command = self.run_zap_precondition)
-        self.run_zap_button.grid(row =4, column =5)
+        self.run_zap_button = tk.Button(self.tab2, text = 'Run ZAP', command = self.run_zap_precondition)
+        self.run_zap_button.grid(row =4, column =5, sticky='ew')
+
+        self.tab2.columnconfigure(0, weight=1)
+        self.tab2.columnconfigure(1, weight=1)
+        self.tab2.columnconfigure(2, weight=1)
+        self.tab2.columnconfigure(3, weight=1)
+        self.tab2.columnconfigure(4, weight=1)
+        self.tab2.columnconfigure(5, weight=1)
+
+        self.tab2.rowconfigure(2, weight=1)
+        self.tab2.rowconfigure(3, weight=1)
+        self.tab2.rowconfigure(4, weight=1)
         
 
-        # Plotting area
+        
+        ######################## Plotting area
         self.figure = Figure(figsize = (12, 4))
         self.ax = self.figure.add_subplot(111)
         self.figure.tight_layout(rect=[0.05, 0.03, 1, 0.92])
@@ -418,13 +461,13 @@ class KCWIViewerApp:
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=root)
         self.canvas.draw()
-        self.canvas.get_tk_widget().grid(row=5, column=0, columnspan=6)
+        self.canvas.get_tk_widget().grid(row=5, column=0, columnspan=6, sticky='nsew')
         self.canvas.get_tk_widget().focus_force()
 
 
         # Add navigation toolbar
         self.toolbarFrame = tk.Frame(master=root)
-        self.toolbarFrame.grid(row=6,column=2, columnspan = 2)
+        self.toolbarFrame.grid(row=6,column=2, columnspan = 2, sticky='ew')
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.toolbarFrame)
         # self.toolbar.home_toggle(True)
 
@@ -436,9 +479,9 @@ class KCWIViewerApp:
 
         #Add the entry to update the indices of x and y coordinates in the DS9 region used for spectrum extraction
         self.region_box_label = tk.Label(root, text = 'Region for spectrum extraction from cube (x1, y1, x2, y2):')
-        self.region_box_label.grid(row = 6, column = 4)
+        self.region_box_label.grid(row = 6, column = 4, sticky='ew')
         self.region_box_entry = tk.Entry(root)
-        self.region_box_entry.grid(row = 6, column = 5)
+        self.region_box_entry.grid(row = 6, column = 5, sticky='ew')
         self.region_box_entry.bind("<Return>", self.update_region_idx)
 
 
@@ -446,7 +489,7 @@ class KCWIViewerApp:
         # Output text widget
         # self.output_text = tk.Text(root, height=5, width=100, font=("Arial", 12))
         self.output_text = scrolledtext.ScrolledText(root, height=10, width=140, font=("Arial", 12), wrap="word")
-        self.output_text.grid(row=7, column=0, columnspan=6)
+        self.output_text.grid(row=7, column=0, columnspan=6, sticky='nsew')
         sys.stderr = RedirectText(self.output_text)
         sys.stdout = RedirectText(self.output_text)
         self.redirect_text = RedirectText(self.output_text)
@@ -472,7 +515,18 @@ class KCWIViewerApp:
         ######### final configuration
         # self.menubar.add_cascade(label="File", menu=self.filemenu)
         # root.config(menu = self.menubar)
-        root.columnconfigure(1, minsize=100, weight=0)
+        root.columnconfigure(0, weight=1)
+        root.columnconfigure(1, weight=1)
+        root.columnconfigure(2, weight=1)
+        root.columnconfigure(3, weight=1)
+        root.columnconfigure(4, weight=1)
+        root.columnconfigure(5, weight=1)
+        
+        root.rowconfigure(1, weight=1)
+        root.rowconfigure(5, weight=1)
+        root.rowconfigure(7, weight=1)
+
+
 
 
         #read in the line table
@@ -1881,7 +1935,7 @@ def update_text_box(text_box: tk.Text, proc: subprocess.Popen):
     return _update_text_box
 
 
-def run_command(command: list[str], text_box: tk.Text):
+def run_command(command: List[str], text_box: tk.Text):
     """Run a command and redirect output to a text box in real-time"""
     proc = subprocess.Popen(
         command,
