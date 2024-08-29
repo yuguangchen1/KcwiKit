@@ -7,7 +7,7 @@ except ImportError:
     from configparser import ConfigParser
 
 conf = ConfigParser()
-conf.read(['setup.cfg'])
+conf.read(['setup.config'])
 metadata = dict(conf.items("metadata"))
 
 NAME = metadata['name']
@@ -30,7 +30,7 @@ entry_points = {
         "kcwi_masksky_ds9_2d = scripts.kcwi_masksky_ds9_2d:main",
         "kcwi_masksky_ds9_thum = scripts.kcwi_masksky_ds9_thum:main",
         "kcwi_masksky_ds9 = scripts.kcwi_masksky_ds9:main",
-        "kcwi_medfilter = scripts.kcwi_medfilter:main:"
+        "kcwi_medfilter = scripts.kcwi_medfilter:main"
     ],
     'gui_scripts': [
         "kcwi_viewer = gui.kcwi_viewer:main"
@@ -49,11 +49,11 @@ setuptools.setup(name=NAME,
       package_data={'': ['data/extin/*', 'data/stds/*']},
       entry_points=entry_points,
       install_requires=[
-        'astropy',
+        'astropy==4.3.1',
         'argparse',
-        'matplotlib',
-        'numpy',
-        'scipy']
+        'matplotlib==3.5.0',
+        'numpy==1.21.2',
+        'scipy==1.7.1']
 )
 
 
