@@ -20,20 +20,20 @@ DESCRIPTION = metadata["description"]
 
 entry_points = {
     'console_scripts': [
-        "kcrm_create_crmsk = scripts.kcrm_create_crmsk:main",
-        "kcrm_group_famres = scripts.kcrm_group_frames:main",
-        "kcwi_collapse = scripts.kcwi_collapse:main",
-        "kcwi_combinestd = scripts.kcwi_combinestd:main",
-        "kcwi_flatten_cube = scripts.kcwi_flatten_cube:main",
-        "kcwi_gen_log = scripts.kcwi_gen_log:main",
-        "kcwi_makemask_medfilter = scripts.kcwi_makemask_medfilter:main",
-        "kcwi_masksky_ds9_2d = scripts.kcwi_masksky_ds9_2d:main",
-        "kcwi_masksky_ds9_thum = scripts.kcwi_masksky_ds9_thum:main",
-        "kcwi_masksky_ds9 = scripts.kcwi_masksky_ds9:main",
-        "kcwi_medfilter = scripts.kcwi_medfilter:main"
+        "kcrm_create_crmsk = kcwikit.scripts.kcrm_create_crmsk:main",
+        "kcrm_group_famres = kcwikit.scripts.kcrm_group_frames:main",
+        "kcwi_collapse = kcwikit.scripts.kcwi_collapse:main",
+        "kcwi_combinestd = kcwikit.scripts.kcwi_combinestd:main",
+        "kcwi_flatten_cube = kcwikit.scripts.kcwi_flatten_cube:main",
+        "kcwi_gen_log = kcwikit.scripts.kcwi_gen_log:main",
+        "kcwi_makemask_medfilter = kcwikit.scripts.kcwi_makemask_medfilter:main",
+        "kcwi_masksky_ds9_2d = kcwikit.scripts.kcwi_masksky_ds9_2d:main",
+        "kcwi_masksky_ds9_thum = kcwikit.scripts.kcwi_masksky_ds9_thum:main",
+        "kcwi_masksky_ds9 = kcwikit.scripts.kcwi_masksky_ds9:main",
+        "kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main"
     ],
     'gui_scripts': [
-        "kcwi_viewer = gui.kcwi_viewer:main"
+        "kcwi_viewer = kcwikit.gui.kcwi_viewer:main"
     ]
 }
 
