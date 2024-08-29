@@ -3,6 +3,8 @@
 .AppleDouble
 .LSOverride
 
+*.egg-info*
+
 # Icon must end with two \r
 Icon
 
