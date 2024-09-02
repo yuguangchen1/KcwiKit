@@ -1,0 +1,16 @@
+[console_scripts]
+kcrm_create_crmsk = kcwikit.scripts.kcrm_create_crmsk:main
+kcrm_group_frames = kcwikit.scripts.kcrm_group_frames:main
+kcwi_collapse = kcwikit.scripts.kcwi_collapse:main
+kcwi_combinestd = kcwikit.scripts.kcwi_combinestd:main
+kcwi_flatten_cube = kcwikit.scripts.kcwi_flatten_cube:main
+kcwi_gen_log = kcwikit.scripts.kcwi_gen_log:main
+kcwi_makemask_medfilter = kcwikit.scripts.kcwi_makemask_medfilter:main
+kcwi_masksky_ds9 = kcwikit.scripts.kcwi_masksky_ds9:main
+kcwi_masksky_ds9_2d = kcwikit.scripts.kcwi_masksky_ds9_2d:main
+kcwi_masksky_ds9_thum = kcwikit.scripts.kcwi_masksky_ds9_thum:main
+kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main
+
+[gui_scripts]
+kcwi_viewer = kcwikit.gui.kcwi_viewer:main
+

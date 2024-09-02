@@ -21,7 +21,7 @@ DESCRIPTION = metadata["description"]
 entry_points = {
     'console_scripts': [
         "kcrm_create_crmsk = kcwikit.scripts.kcrm_create_crmsk:main",
-        "kcrm_group_famres = kcwikit.scripts.kcrm_group_frames:main",
+        "kcrm_group_frames = kcwikit.scripts.kcrm_group_frames:main",
         "kcwi_collapse = kcwikit.scripts.kcwi_collapse:main",
         "kcwi_combinestd = kcwikit.scripts.kcwi_combinestd:main",
         "kcwi_flatten_cube = kcwikit.scripts.kcwi_flatten_cube:main",
