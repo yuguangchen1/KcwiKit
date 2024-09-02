@@ -74,6 +74,9 @@ def group_frames(logfile, outfile, continuous=False, display=False, check_int=Fa
             continue
 
         if check_int:
+            #the redux_dir is a list if --redux_dir is specified
+            if isinstance(redux_dir, list):
+                redux_dir = redux_dir[0]
             intfn = os.path.join(redux_dir, row['No.'].replace('.fits', '_int.fits'))
             if not os.path.isfile(intfn):
                 continue
