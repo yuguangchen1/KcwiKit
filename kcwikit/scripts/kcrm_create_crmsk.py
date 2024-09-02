@@ -28,7 +28,8 @@ def parser_init():
         '-l', '--label',
         help='List of grouping labels to operate.',
         type=str,
-        nargs='*'
+        nargs='*',
+        default = []
         )
     
     parser.add_argument(
@@ -116,6 +117,12 @@ def create_crmsk(filename, label=[], base_dir='./', redux_dir='redux'):
     if isinstance(filename, list):
         filename = filename[0]
 
+    if isinstance(redux_dir, list):
+        redux_dir = redux_dir[0]
+
+    if isinstance(base_dir, list):
+        base_dir = base_dir[0]
+    
     redux = os.path.join(base_dir, redux_dir)
 
     obj_dict = json.load(open(filename, 'r'))
