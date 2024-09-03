@@ -28,7 +28,7 @@ def parser_init():
 
 _pre = 'kcwi_combinestd.py'
 
-def main(listfile, noplot=False):
+def combinestd(listfile, noplot=False):
 
     # import plotting libraries
     if not noplot:
@@ -177,9 +177,11 @@ def main(listfile, noplot=False):
 
     return
 
+def main():
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+    combinestd(**vars(args))
+
 
 if __name__=='__main__':
-
-    args = parser_init()
-
-    main(**vars(args))
+    main()
