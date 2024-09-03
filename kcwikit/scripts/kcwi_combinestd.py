@@ -27,8 +27,9 @@ def parser_init():
         action='store_true',
         help='Creat plot?')
 
-    args = parser.parse_args()
-    return args
+    # args = parser.parse_args()
+    # return args
+    return parser
 
 
 _pre = 'kcwi_combinestd.py'
