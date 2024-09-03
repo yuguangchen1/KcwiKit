@@ -31,9 +31,6 @@ entry_points = {
         "kcwi_masksky_ds9_thum = kcwikit.scripts.kcwi_masksky_ds9_thum:main",
         "kcwi_masksky_ds9 = kcwikit.scripts.kcwi_masksky_ds9:main",
         "kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main"
-    ],
-    'gui_scripts': [
-        "kcwi_viewer = kcwikit.gui.kcwi_viewer:main"
     ]
 }
 
@@ -46,7 +43,7 @@ setuptools.setup(name=NAME,
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       packages=setuptools.find_packages(),
-      package_data={'': ['data/extin/*', 'data/stds/*']},
+      package_data={'': ['data/extin/*', 'data/stds/*']}, # These should belong to KSkyWizard, but are tmp kept here for safety purposes
       entry_points=entry_points,
       install_requires=[
         'astropy==4.3.1',

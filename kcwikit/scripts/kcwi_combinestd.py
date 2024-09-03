@@ -16,11 +16,16 @@ def parser_init():
     description = 'Combining inverse sensitivity curves from multiple exposures of standard stars.'
 
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('listfile', type=str, nargs=1,
-            help='List file containing all exposures.')
-    parser.add_argument('--noplot', dest='noplot',
-            action='store_true',
-            help='Creat plot?')
+    parser.add_argument(
+        'listfile', 
+        type=str, 
+        nargs=1,
+        help='List file containing all exposures.')
+    parser.add_argument(
+        '--noplot', 
+        dest='noplot',
+        action='store_true',
+        help='Creat plot?')
 
     args = parser.parse_args()
     return args
@@ -49,19 +54,33 @@ def combinestd(listfile, noplot=False):
     # read the list
     listtab = io.ascii.read(listfile, format='no_header', comment='\s*#')
 
+    # Invsens from KSkyWizard?
+    if 'updated' in listtab['col1'][0]:
+        telluric_flag = True
+    else:
+        telluric_flag = False
+
+    # red or blue?
+    if 'kr' in listtab['col1'][0]:
+        kcrm_flag = True
+    else:
+        kcrm_flag = False
 
     # setup bokeh plot
     if not noplot:
-        p1 = figure(title="Effective aperture", x_axis_label='Wavelength', y_axis_label='EA')
-        p2 = figure(title='Inverse sensitivity', x_axis_label='Wavelength', y_axis_label='IS')
+        
+        if not telluric_flag:
+            p1 = figure(title="Effective aperture", x_axis_label='Wavelength', y_axis_label='EA')
+            p2 = figure(title='Inverse sensitivity', x_axis_label='Wavelength', y_axis_label='IS')
+        else:
+            p1 = figure(title="Telluric Absorption", x_axis_label='Wavelength', y_axis_label='TA')
+            p2 = figure(title='Inverse sensitivity', x_axis_label='Wavelength', y_axis_label='IS')
 
         palette = [cc.rainbow[int(i / len(listtab) * 255)] for i in range(len(listtab))]
 
-
-
     # loop through all FITS files
     for i, invsensfn in enumerate(listtab['col1']):
-
+        
         # read file
         hdu = fits.open(invsensfn)[0]
         data = hdu.data
@@ -74,9 +93,14 @@ def combinestd(listfile, noplot=False):
 
         # check instrument setup
         ifunam = hdr['IFUNAM']
-        gratnam = hdr['BGRATNAM']
-        cwave = np.round(hdr['BCWAVE'])
-        pwave = np.round(hdr['BPWAVE'])
+        if not kcrm_flag:
+            gratnam = hdr['BGRATNAM']
+            cwave = np.round(hdr['BCWAVE'])
+            pwave = np.round(hdr['BPWAVE'])
+        else:
+            gratnam = hdr['RGRATNAM']
+            cwave = np.round(hdr['RCWAVE'])
+            pwave = np.round(hdr['RPWAVE'])
         if i==0:
             ifunam0 = ifunam
             gratnam0 = gratnam
@@ -102,27 +126,67 @@ def combinestd(listfile, noplot=False):
             invsens_0 = li(wave0)
             li = interp1d(wave, data[1, :], kind='linear', bounds_error=False, fill_value='extrapolate')
             invsens_1 = li(wave0)
+            if telluric_flag:
+                li = interp1d(wave, data[2, :], kind='linear', bounds_error=False, fill_value='extrapolate')
+                invsens_2 = li(wave0)
+                li = interp1d(wave, data[3, :], kind='linear', bounds_error=False, fill_value='extrapolate')
+                invsens_3 = li(wave0)
+                li = interp1d(wave, data[4, :], kind='linear', bounds_error=False, fill_value='extrapolate')
+                invsens_4 = li(wave0)
+                if len(data) > 5:
+                    li = interp1d(wave, data[5, :], kind='linear', bounds_error=False, fill_value='extrapolate')
+                    invsens_5 = li(wave0)
+                else:
+                    invsens_5 = np.zeros(len(wave0)) + np.nan
         else:
             invsens_0 = data[0, :]
             invsens_1 = data[1, :]
+            if telluric_flag:
+                invsens_2 = data[2, :]
+                invsens_3 = data[3, :]
+                invsens_4 = data[4, :]
+                if len(data) > 5:
+                    invsens_5 = data[5, :]
+                else:
+                    invsens_5 = np.zerors(len(wave0)) + np.nan
 
         # Plot
         if not noplot:
-            p2.line(wave0, invsens_0, color=palette[i])
-            p2.line(wave0, invsens_1, color=palette[i], line_width=2,legend_label=os.path.basename(invsensfn))
+            if not telluric_flag:
+                # DRP
+                p2.line(wave0, invsens_0, color=palette[i])
+                p2.line(wave0, invsens_1, color=palette[i], line_width=2,legend_label=os.path.basename(invsensfn))
+            else:
+                # KSkyWizard
+                # invsens
+                p2.line(wave0, invsens_0, color=palette[i])
+                p2.line(wave0, invsens_3, color=palette[i], line_width=2,legend_label=os.path.basename(invsensfn))
+
+                # telluric
+                p1.line(wave0, invsens_5, color=palette[i], line_width=2)
 
 
         # Store all data
         if i==0:
             invsens_0_all = np.zeros((len(listtab), len(wave0)))
             invsens_1_all = np.zeros((len(listtab), len(wave0)))
+            if telluric_flag:
+                invsens_2_all = np.zeros((len(listtab), len(wave0)))
+                invsens_3_all = np.zeros((len(listtab), len(wave0)))
+                invsens_4_all = np.zeros((len(listtab), len(wave0)))
+                invsens_5_all = np.zeros((len(listtab), len(wave0)))
 
         invsens_0_all[i, :] = invsens_0
         invsens_1_all[i, :] = invsens_1
+        if telluric_flag:
+            invsens_2_all[i, :] = invsens_2
+            invsens_3_all[i, :] = invsens_3
+            invsens_4_all[i, :] = invsens_4
+            invsens_5_all[i, :] = invsens_5
 
 
         # Plot EA
-        if not noplot:
+        if (not noplot) and (not telluric_flag):
             hdu_ea = fits.open(invsensfn.replace('_invsens', '_ea'))[0]
             data_ea = hdu_ea.data
 
@@ -137,21 +201,39 @@ def combinestd(listfile, noplot=False):
     if len(listtab)!=1:
         data0[0, :] = np.nanmean(invsens_0_all, axis=0)
         data0[1, :] = np.nanmean(invsens_1_all, axis=0)
+        if telluric_flag:
+            data0[2, :] = np.nanmean(invsens_2_all, axis=0)
+            data0[3, :] = np.nanmean(invsens_3_all, axis=0)
+            data0[4, :] = np.nanmean(invsens_4_all, axis=0) * 0 # remove all fitting points
+            data0[5, :] = np.nanmean(invsens_5_all, axis=0)
     else:
         data0[0, :] = invsens_0_all.flatten()
         data0[1, :] = invsens_1_all.flatten()
+        if telluric_flag:
+            data0[2, :] = invsens_2_all.flatten()
+            data0[3, :] = invsens_3_all.flatten()
+            data0[4, :] = invsens_4_all.flatten()
+            data0[5, :] = invsens_5_all.flatten()
 
 
     # write
+    hdr['OBJECT'] = 'combined'
     hdu_new = fits.PrimaryHDU(data0, header=hdr)
-    hdu_new.writeto(listfile.replace('.list', '_invsens.fits'), overwrite=True)
+    if not telluric_flag:
+        hdu_new.writeto(listfile.replace('.list', '_invsens.fits'), overwrite=True)
+    else:
+        hdu_new.writeto(listfile.replace('.list', '_invsens_updated.fits'), overwrite=True)
 
 
 
     if not noplot:
         # plot combined
         p2.line(wave0, data0[0, :], color='black')
-        p2.line(wave0, data0[1, :], color='black', line_width=2, legend_label='Combined')
+        if not telluric_flag:
+            p2.line(wave0, data0[1, :], color='black', line_width=2, legend_label='Combined')
+        else:
+            p2.line(wave0, data0[3], color='black', line_width=2, legend_label='Combined')
+            p1.line(wave0, data0[5], color='black', line_width=2)
 
 
         # wavegood boundary
@@ -167,8 +249,15 @@ def combinestd(listfile, noplot=False):
         p2.add_layout(wavgood1_vline)
 
         # Setting range
-        p1.y_range = Range1d(0, 2.5e5)
-        p2.y_range = Range1d(0, 1e-16)
+        if not telluric_flag:
+            p1.y_range = Range1d(0, 2.5e5)
+        else:
+            p1.y_range = Range1d(0, 1.2)
+
+        if not kcrm_flag:
+            p2.y_range = Range1d(0, 1e-16)
+        else:
+            p2.y_range = Range1d(0, 3e-17)
         col = column(p1, p2)
         output_file(filename = listfile.replace('list','html'))
         show(col)
