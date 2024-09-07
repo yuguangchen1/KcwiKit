@@ -46,11 +46,13 @@ setuptools.setup(name=NAME,
       package_data={'': ['data/extin/*', 'data/stds/*']}, # These should belong to KSkyWizard, but are tmp kept here for safety purposes
       entry_points=entry_points,
       install_requires=[
-        'astropy==4.3.1',
+        'astropy < 6.0',
         'argparse',
-        'matplotlib==3.5.0',
-        'numpy==1.21.2',
-        'scipy==1.7.1']
+        'matplotlib',
+        'numpy',
+        'scipy',
+        'pyregion',
+        'MontagePy']
 )
 
 
