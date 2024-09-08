@@ -25,13 +25,12 @@ def parser_init():
             action='store_const', const=0, default=0,
             help='Pixels to be trimmed')
 
-    args = parser.parse_args()
-    return args
+    return parser
 
 
 
 
-def main(file, reverse=False, mask = False, trim=0):
+def flatten_cube(file, reverse=False, mask = False, trim=0):
 
     pre = 'kcwi_flatten_cube.py'
 
@@ -174,10 +173,11 @@ def main(file, reverse=False, mask = False, trim=0):
     return
 
 
-
-
+def main():
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+    flatten_cube(**vars(args))
 
 
 if __name__ == '__main__':
-    args = parser_init()
-    main(**(vars(args)))
+    main()
