@@ -54,6 +54,8 @@ setuptools.setup(name=NAME,
         'scipy',
         'pyregion',
         'fpdf',
+        'bokeh',
+        'colorcet',
         'tqdm',
         'MontagePy']
 )

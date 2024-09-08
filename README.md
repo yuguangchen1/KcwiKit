@@ -4,7 +4,7 @@
 
 Welcome to `KCWIKit`!
 
-`KCWIKit` extends the official KCWI DRP with a variety of stacking tools and DRP improvements. The software offers masking and median filtering scripts to be used while running the KCWI DRP, and a step-by-step KCWI_DRP implementation for finer control over the reduction process. Once the DRP has finished, `KCWIKit` can be used to stack the output cubes via the `Montage` package. Various functions cross-correlate and mosaic the constituent cubes and the final stacked cubes are WCS corrected. Helper functions can then be used to deproject the stacked cube into lower-dimensional representations should the user desire.
+`KCWIKit` is a community developed package to extend the official KCWI DRP with a variety of stacking tools and DRP improvements. The software offers masking and median filtering scripts to be used while running the KCWI DRP, and a step-by-step KCWI_DRP implementation for finer control over the reduction process. Once the DRP has finished, `KCWIKit` can be used to stack the output cubes via the [`Montage`](http://montage.ipac.caltech.edu/) package. Various functions cross-correlate and mosaic the constituent cubes and the final stacked cubes are WCS corrected. Helper functions can then be used to deproject the stacked cube into lower-dimensional representations should the user desire.
 
 This repo is organized as follows:
 - docs/ Documentation and Instructions
@@ -37,10 +37,7 @@ KCWIKit is recommended to be installed with `python <= 3.9`.
     <details>
     <summary> Alternative: Install the command line version </summary>
 
-    If the above installation fails, alternatively, you can choose to install the command line tools by compiling from the source code:
-        
-    ```bash
-    ```
+    If the above installation fails, alternatively, you can choose to install the command line tools by compiling from the [source code](http://montage.ipac.caltech.edu/docs/download2.html).
     </details>
 
 3. Git clone this repository and run the setup tools. 
@@ -59,19 +56,17 @@ KCWIKit is recommended to be installed with `python <= 3.9`.
 
 ## Instuctions
 
-Outline:
+1. Installing and running the improved DRP. 
 
-1. Install and run the improved DRP. 
-
-    1.1. Install the modified DRP
+    1.1. Installing the modified DRP
 
     1.2. Running the DRP for the blue channel
 
     1.3. Running the DRP for the red channel
 
-2. Running the post-DRP stacking code. 
+2. [Running the post-DRP stacking code.](./kcwikit/docs/KCWI_post-DRP_stacking.md)
 
-3. Scripts.
+3. [Scripts.](./kcwikit/docs/scripts_instruction.md)
 
 ## Examples
 
