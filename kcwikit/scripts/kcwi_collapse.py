@@ -16,11 +16,10 @@ def parser_init():
     parser.add_argument('--usepix', dest='use_pix',
             action='store_true', help='Use pixel index for the wavelength direction')
 
-    args = parser.parse_args()
-    return args
+    return parser
 
 
-def main(file, wavebin=None, use_pix=False):
+def collapse(file, wavebin=None, use_pix=False):
 
     pre = 'kcwi_collapse.py'
 
@@ -128,10 +127,13 @@ def main(file, wavebin=None, use_pix=False):
         else:
             print(pre + 'File not found - ' + fn)
 
+def main():
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+    collapse(**vars(args))
 
 if __name__ == '__main__':
-    args = parser_init()
-    main(**vars(args))
+    main()
 
 
 
