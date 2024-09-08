@@ -17,9 +17,15 @@ Check the subdirectories for additional instructions and prerequisites.
 
 ## Installation
 
-KCWIKit is recommended to be installed 
+KCWIKit is recommended to be installed with `python <= 3.9`. 
 
-1. (optional) Activate the KCWI DRP environment. 
+1. Activate the KCWI DRP environment.
+    
+    Or create a new Python environment. 
+
+    ```bash
+    conda create -n kskywizard python=3.8
+    ```
 
 2. Install `MontagePy` or the `Montage` command line tools. The two forms of the `Montage` package performs the same functions. You can choose either to install.
 
@@ -40,15 +46,15 @@ KCWIKit is recommended to be installed
 3. Git clone this repository and run the setup tools. 
 
     ```bash
-    git clone https://github.com/
+    git clone https://github.com/yuguangchen1/KcwiKit.git 
     cd KCWIKit
-    python setup.py install
+    pip install .
     ```
 
 4. <details>
     <summary>(optional) Install KCWI Sky Wizard. </summary>
 
-    `KSkyWizard` is a standalone tool to perform telluric correction and advanced sky subtraction based on PCA models for the red channel (KCRM). It is recommended to be run on `Python >= 3.11` environments. We refer to the [KSkyWizard documentation](http) for the installation and instruction. 
+    `KSkyWizard` is a standalone tool to perform telluric correction and advanced sky subtraction based on PCA models for the red channel (KCRM). It is recommended to be run on `Python >= 3.11` environments. We refer to the [KSkyWizard documentation](https://github.com/zhuyunz/KSkyWizard) for the installation and instruction. 
     </details>
 
 ## Instuctions
@@ -71,7 +77,7 @@ Outline:
 
 ### KCWIKit at KSM24
 
-KCWIKit is hosting a breakout session at the 2024 Keck Science Meeting! 
+KCWIKit is hosting a breakout session at the [2024 Keck Science Meeting](https://kecksciencemeeting.org/breakout-sessions/)! 
 
 
 ## Citing KCWIKit

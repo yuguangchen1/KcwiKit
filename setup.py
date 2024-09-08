@@ -53,6 +53,8 @@ setuptools.setup(name=NAME,
         'numpy',
         'scipy',
         'pyregion',
+        'fpdf',
+        'tqdm',
         'MontagePy']
 )
 
