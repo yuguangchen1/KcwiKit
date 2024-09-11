@@ -61,6 +61,7 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
     uts = []
     ras = []
     decs = []
+    els = []
     airmasses = []
     exptimes = []
     binnings = []
@@ -98,6 +99,7 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
         uts.append(hdr['UT'])
         ras.append(hdr['RA'])
         decs.append(hdr['DEC'])
+        els.append(hdr['EL'])
         airmasses.append(hdr['AIRMASS'])
         exptimes.append(hdr['TTIME'])
         binnings.append(hdr['BINNING'])
@@ -122,8 +124,8 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
         rotmodes.append(hdr['ROTMODE'])
         skypas.append(hdr['ROTPOSN'] + hdr['ROTREFAN'])
 
-    t = Table( (nos, cameras, objects, imtypes, groupids, statenames, targets, lsts, uts, ras, decs, airmasses, exptimes, binnings, ampmodes, ccdspeeds, ccdmodes, gratings, filters, cwaves, nsmasks, ifus, rotmodes, skypas), \
-        names=('No.', 'Camera', 'Object', 'ImType', 'GroupID', 'State Name', 'Target', 'LST', 'UT', 'RA', 'DEC', 'AIRMASS', 'Exptime', 'Binning', 'Ampmode', 'CCD Speed', 'CCD Mode', 'Grating', 'Filter', 'Central wave', 'NS mask', 'IFU', 'Rot Mode', 'Sky PA'))
+    t = Table( (nos, cameras, objects, imtypes, groupids, statenames, targets, lsts, uts, ras, decs, els, airmasses, exptimes, binnings, ampmodes, ccdspeeds, ccdmodes, gratings, filters, cwaves, nsmasks, ifus, rotmodes, skypas), \
+        names=('No.', 'Camera', 'Object', 'ImType', 'GroupID', 'State Name', 'Target', 'LST', 'UT', 'RA', 'DEC', 'ELS', 'AIRMASS', 'Exptime', 'Binning', 'Ampmode', 'CCD Speed', 'CCD Mode', 'Grating', 'Filter', 'Central wave', 'NS mask', 'IFU', 'Rot Mode', 'Sky PA'))
     
     if display:
         print(t)
