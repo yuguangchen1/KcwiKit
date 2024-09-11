@@ -197,4 +197,8 @@ In the `jupyter` notebook, or a `Python` script.
 
     A: We recommend to always (maybe except for the small slicer) perform sub-slice dithering, or rotation to the FoV to improve the spatial sampling (see [Chen+21](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508...19C/abstract)). If you did not do this in your observation, the best fix may be using cubic or linear interpolations, instead of the drizzle algorithm. When stacking, run `kcwi.kcwi_stack(fn, method='bicubic')` or `kcwi.kcwi_stack(fn, method='bilinear')`.
 
+- My computer ran out of memory space when stacking the small slicer data. 
+
+    A: Use `kcwi_stack(fn, lowmem=True)`. This will significantly increase the amount of time to run the stacking code, but reduces the memory consumption by not loading all the individual frames at once. 
+
 

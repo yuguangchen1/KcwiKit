@@ -66,11 +66,11 @@ KCWIKit is recommended to be installed with `python <= 3.9`.
 
 2. [Running the post-DRP stacking code.](./kcwikit/docs/KCWI_post-DRP_stacking.md)
 
-3. [Scripts.](./kcwikit/docs/scripts_instruction.md)
+3. [Command Line Tools.](./kcwikit/docs/scripts_instruction.md)
 
 ## Examples
 
-### KCWIKit at KSM24
+## KCWIKit at KSM24
 
 KCWIKit is hosting a breakout session at the [2024 Keck Science Meeting](https://kecksciencemeeting.org/breakout-sessions/)! 
 
