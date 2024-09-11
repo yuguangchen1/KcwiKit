@@ -443,7 +443,7 @@ def kcwi_medfilter_actonone(args, par):
 
 
 
-def main(args, master_par):
+def median_filter(args, master_par):
 
     # set up progress bar
     tqdm.set_lock(multiprocessing.RLock())
@@ -461,10 +461,9 @@ def main(args, master_par):
     return
 
 
-
-
-
-if __name__ == '__main__':
+def main():
+    #arg_parser = parser_init()
+    #args = arg_parser.parse_args()
 
     args = parser_init()
 
@@ -476,6 +475,8 @@ if __name__ == '__main__':
 
     # Generate a master parameter table
     master_par = kcwi_medfilter_master_par(args, ppar)
+    median_filter(args, master_par)
 
+if __name__ == '__main__':
 
-    main(args, master_par)
+    main()
