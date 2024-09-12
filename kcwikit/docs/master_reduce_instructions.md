@@ -1,5 +1,5 @@
 # KCWI DRP Instructions
-## A guide to `master_reduce` aka the complete and thorough KCWI reduction
+## A guide to [`master_reduce`](../examples/master_reduce) aka the complete and thorough KCWI reduction
 ### Last updated: 9/19/2022
 
 Quick reference: `master_reduce -h` or `head ~/Software/kcwi/pyDRP/master_reduce`
@@ -17,7 +17,7 @@ Location: `/path/to/dir/kcwi/pyDRP/mater_reduce` i.e. kcwi directory structure i
 1. `cd` to the raw data directory (you can specify this with the `-d` flag otherwise the code will assume you’re in the raw directory)
 
 2. Construct a list of science target base names - this helps the code differentiate standard stars and twilights from science exposures
-  - See a sample text file at `kcwi/pyDRP/sample_sci_objs.txt` for reference
+  - See a sample text file at [`sample_sci_objs.txt`](../examples/sample_sci_objs.txt) for reference
   - Example: `echo kb210115_000{53..71} | xargs -n 1 > sci.txt` if the science images were numbered 53 through 71.
   - File name is arbitrary (`sci.txt` is default)
 
