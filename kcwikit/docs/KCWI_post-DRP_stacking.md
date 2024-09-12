@@ -20,7 +20,7 @@ The input files nominally come in two flavors:
 
 ## The `.list`  File
 
-A sample `.list` file is provided [here](../examples/q2343-BX610.list) and the first few lines are displayed here for convenience.
+A sample `.list` file is provided [here](../examples/q0256-md34.list) and the first few lines are displayed here for convenience.
 
 ```
 /scr/yuguangchen/obs/kcwi/kcwi_nov19/2019nov29/redux/kb191129_00041 3 3
@@ -42,7 +42,7 @@ Here's a simple command that can be used to produce sequential lists of cubes in
 
 The parameter file takes in a list of options used while stacking and to define the output stack (e.g. final stack dimensions, pixel scales, reference astrometry images, etc.).
 
-Here is [A complete reference of the parameter file](./parameter_file_reference.md). Typically, only a small fraction of the parameters are necessary. Here is a [sample parameter file](../examples/q2343-BX610.par), which is also displayed here.
+Here is [A complete reference of the parameter file](./parameter_file_reference.md). Typically, only a small fraction of the parameters are necessary. Here is a [sample parameter file](../examples/q0256-md34.par), which is also displayed here.
 
 ```
 dimension 100 100
@@ -74,7 +74,7 @@ Each of these parameters correspond to arguments in the `kcwi_align`, `kcwi_stac
 
 ## A `jupyter` notebook
 
-A `jupyter` notebook can be used to display the stacking (text) outputs and several diagnostic plots for each stage. A sample notebook is provided [here](../examples/q2343-BX610.ipynb).
+A `jupyter` notebook can be used to display the stacking (text) outputs and several diagnostic plots for each stage. A sample notebook is provided [here](../examples/q0256-md34.ipynb).
 
 
 # Running the procedures
