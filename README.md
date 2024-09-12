@@ -13,7 +13,7 @@ This repo is organized as follows:
 - DRP/ Improving the [Python pipeline](https://kcwi-drp.readthedocs.io/en/latest/).
 - archs/ archival programs for the [IDL pipeline](https://github.com/Keck-DataReductionPipelines/KcwiDRP).(No longer supported.)
 
-Check the subdirectories for additional instructions and prerequisites. 
+We maintain a separate tool [`KCWI Sky Wizard`](https://github.com/zhuyunz/KSkyWizard) for the telluric correction and sky subtraction. 
 
 ## Installation
 
