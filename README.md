@@ -58,11 +58,11 @@ KCWIKit is recommended to be installed with `python <= 3.9`.
 
 1. Installing and running the improved DRP. 
 
-    1.1. Installing the modified DRP
+    1.1. [Installing the modified DRP](./kcwikit/docs/install_DRP.md)
 
     1.2. Running the DRP for the blue channel
 
-    1.3. Running the DRP for the red channel
+    1.3. Running the DRP for the red channel (under construction)
 
 2. [Running the post-DRP stacking code.](./kcwikit/docs/KCWI_post-DRP_stacking.md)
 

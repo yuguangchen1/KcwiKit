@@ -6,7 +6,9 @@
 
 There are two methods to install the modified DRP. 
 
-1. If you have installed the official DRP with `Python ~= 3.8`, you can download the modified files from the [pyDRP](../pyDRP/) directory in this repository and replace the older ones with them. Then, rerun the installation script (`python setup.py install`). 
+1. If you have installed the official DRP with `Python ~= 3.8`, you can download the modified files from the [pyDRP](../pyDRP/) directory in this repository and replace the older ones with them. For example, copy all files in the [`pyDRP/primitives`](../pyDRP/primitives/) to the `KCWI_DRP/kcwidrp/primitives` directory where your local version of the DRP is installed.
+
+    Then, rerun the installation script (`python setup.py install`). 
 
 2. Alternatively, we keep a separate version of DRP at `https://github.com/yuguangchen1/KCWI_DRP/tree/KCWIKit`. Download this updated version.
 
@@ -22,3 +24,6 @@ There are two methods to install the modified DRP.
     ```
 
 
+## Summary of the improvements. 
+
+(Under construction)
