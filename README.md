@@ -60,15 +60,18 @@ KCWIKit is recommended to be installed with `python <= 3.9`.
 
     1.1. [Installing the modified DRP](./kcwikit/docs/install_DRP.md)
 
-    1.2. Running the DRP for the blue channel
+    1.2. [Running the DRP for the blue channel](./kcwikit/docs/Running_blue_DRP.md)
 
-    1.3. Running the DRP for the red channel (under construction)
+    1.3. [Running the DRP for the red channel](./kcwikit/docs/Running_red_DRP.md)
 
 2. [Running the post-DRP stacking code.](./kcwikit/docs/KCWI_post-DRP_stacking.md)
 
 3. [Command Line Tools.](./kcwikit/docs/scripts_instruction.md)
 
 ## Examples
+[Here](./kcwikit/examples/) are some examples for the stacking code which are referenced in the instructions. 
+
+Some KCWI-red commissioning data are shared [here](https://drive.google.com/drive/folders/1j94cx0IZTZLTpLdm6QRKcpDQm-RvMWOJ) if you would like to try running the code. 
 
 ## KCWIKit at KSM24
 
