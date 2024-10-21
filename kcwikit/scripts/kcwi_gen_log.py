@@ -108,7 +108,7 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
         ccdmodes.append(hdr['CCDMODE'])
 
         if cameras[-1] == 'BLUE':
-            gratings.append(['BGRATNAM'])
+            gratings.append(hdr['BGRATNAM'])
             filters.append(hdr['BFILTNAM'])
             cwaves.append(hdr['BCWAVE'])
             pwaves.append(hdr['BPWAVE'])
@@ -129,6 +129,7 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
     
     if display:
         print(t)
+    import pickle; pickle.dump(t, open('tmp.pickle', 'wb'))
 
     t.write(outfile, overwrite=True, format='csv')
 
