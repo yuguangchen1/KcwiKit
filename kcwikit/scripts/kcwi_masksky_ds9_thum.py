@@ -1,44 +1,36 @@
 #!/usr/bin/env python
 
-"""Creates mask image from ds9 region file.
+from astropy.io import fits as pf
+from regions import Regions
 
-Args:
-    imagename (string): The name of a *_intf.fits image
-    regionname (string): The name of a ds9 region file
-
-Returns:
-    None
-
-Note:
-    To use this routine, process your data with kcwi_stage4flat.pro.
-    Then display the target *_intf.fits file in ds9.
-    Use region shapes to indicate non-sky pixels in image (box, circle, etc.).
-    Write out ds9 region file (*.reg).
-    Run this routine:
-
-    python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111_intf.fits ds9.reg
-
-    (replace paths/filenames with your local paths/filenames)
-
-    This should create kb180101_00111_smsk.fits, which will be used when you
-    run kcwi_stage5sky.pro.
-"""
-try:
-    import astropy
-except ImportError:
-    print("Please install astropy: required for image I/O")
-    quit()
-try:
-    import pyregion
-except ImportError:
-    print("Please install pyregion: required for DS9 region I/O")
-    quit()
 import numpy as np
 import sys
 import os
-import pdb
 
 def main():
+    """Creates mask image from ds9 region file.
+
+    Args:
+        imagename (string): The name of a *_intf.fits image
+        regionname (string): The name of a ds9 region file
+
+    Returns:
+        None
+
+    Note:
+        To use this routine, create white-light image with `kcwi_collapse`.
+        Then display the target *_icube.thum.fits file in ds9.
+        Use region shapes to indicate non-sky pixels in image (box, circle, etc.).
+        Write out ds9 region file (*.reg).
+        Run this routine:
+
+        kcwi_masksky_ds9_thum kb180101_00111_icube.thum.fits ds9.reg
+
+        (replace paths/filenames with your local paths/filenames)
+
+        This should create kb180101_00111_icube.mask.fits, which will be used for 
+        median filtering.
+    """
 
     # check args
     narg=len(sys.argv)
@@ -56,11 +48,6 @@ def main():
     imfname=sys.argv[1]
     regfname=sys.argv[2]
 
-    # make sure it's an _intf image
-    #if '_intf.fits' not in imfname:
-    #    print("imagename must be _intf.fits image")
-    #    exit()
-
     # do inputs exist?
     if os.path.exists(imfname) == False:
         print("File does not exist: "+imfname)
@@ -75,24 +62,30 @@ def main():
     print("Creating: "+outfile)
 
     # load the header from the pointed-to image.
-    hdu_list = astropy.io.fits.open(imfname)
+    hdu_list = pf.open(imfname)
     header= hdu_list[0].header
+    shape = hdu_list[0].shape
 
-    # determine the size of the array
-    shape = (header["NAXIS1"], header["NAXIS2"])
+    # load the region file
+    with open(regfname, 'r') as f:
+        # Read it out as a string
+        regstr = f.read()
+        
+        # Check if the region file is in physical coordinates
+        if 'physical' in regstr:
+            print("[Warning] 'physical' coordinates not supported by regions. Replacing with 'image'")
+            regstr = regstr.replace('physical', 'image')
 
-    try:
-        # load in the region file
-        r = pyregion.open(regfname).as_imagecoord(header)
-    except ValueError:
-        print('Region File is Empty (contains no objects)')
-        sys.exit(1)
-
-    m = r.get_mask(hdu=hdu_list[0])
-    #pdb.set_trace()
+        r = Regions.parse(regstr, format='ds9')
+        mask = None
+        for region in r.regions:
+            if mask is None:
+                mask = region.to_mask().to_image(shape).astype(bool)
+            else:
+                mask = mask | region.to_mask().to_image(shape).astype(bool)
 
     # write out the mask
-    hdu = astropy.io.fits.PrimaryHDU(np.uint8(m))
+    hdu = pf.PrimaryHDU(np.uint8(mask))
     hdu.writeto(outfile, overwrite=True)
 
     print("Done.")
