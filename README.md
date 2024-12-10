@@ -17,14 +17,17 @@ We maintain a separate tool [`KCWI Sky Wizard`](https://github.com/zhuyunz/KSkyW
 
 ## Installation
 
-KCWIKit is recommended to be installed with `python <= 3.9`. 
+KCWIKit is recommended to be installed with `python=~3.12`. 
 
 1. Activate the KCWI DRP environment.
+    ```bash
+    conda activate kcwidrp
+    ```
     
     Or create a new Python environment. 
 
     ```bash
-    conda create -n kskywizard python=3.8
+    conda create -n kcwikit python=3.12
     ```
 
 2. Install `MontagePy` or the `Montage` command line tools. The two forms of the `Montage` package performs the same functions. You can choose either to install.
