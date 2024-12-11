@@ -1109,7 +1109,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdr0['CD2_1']=0
     #hdr0['CTYPE3']='WAVE'
     #hdr0['BUNIT']='10^(-16)erg/s/cm2/Angstrom'
-    hdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
+    hdr0['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
     if suffix!='cubes':
         #hdr0['BUNIT']='adu/s'
         hdr0['BUNIT']='count/s/arcsec2'
@@ -1264,8 +1264,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             else:
                 hdu_i.data=hdu_i.data/area
                 hdu_v.data=hdu_v.data/area**2
-                hdu_i.header['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
-                hdu_v.header['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+                hdu_i.header['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
+                hdu_v.header['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
 
 
             # preshift
@@ -1657,7 +1657,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     vhdr0=hdr0.copy()
     if suffix=='cubes':
         #vhdr0['BUNIT']='10^(-32)erg2/s2/cm4/Angstrom2'
-        vhdr0['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+        vhdr0['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
     else:
         #vhdr0['BUNIT']='adu2/s2'
         vhdr0['BUNIT']='count2/s2/arcsec4'
