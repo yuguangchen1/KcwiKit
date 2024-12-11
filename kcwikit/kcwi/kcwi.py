@@ -1386,6 +1386,28 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     hdu_m = kcwi_resample_wave(hdu_m, hdr0, method='mask')
                     hdu_e = kcwi_resample_wave(hdu_e, hdr0, method='linear')
 
+            # Hot fix for issue #6
+            dtype = np.int32
+            try:
+                oflow_limit = np.iinfo(dtype).max
+            except:
+                oflow_limit = np.finfo(dtype).max
+
+            fac_i = np.float64(oflow_limit) / np.nanmax(hdu_i.data) / 100
+            fac_v = np.float64(oflow_limit) / np.nanmax(hdu_v.data) / 100
+            fac_m = np.float64(oflow_limit) / np.nanmax(hdu_m.data) / 100
+            fac_e = np.float64(oflow_limit) / np.nanmax(hdu_e.data) / 100
+
+            hdu_i.data = (hdu_i.data * fac_i).astype(dtype)
+            hdu_v.data = (hdu_v.data * fac_v).astype(dtype)
+            hdu_m.data = (hdu_m.data * fac_m).astype(dtype)
+            hdu_e.data = (hdu_e.data * fac_e).astype(dtype)
+
+            hdu_i.header['ISS6FIX'] = fac_i
+            hdu_v.header['ISS6FIX'] = fac_v
+            hdu_m.header['ISS6FIX'] = fac_m
+            hdu_e.header['ISS6FIX'] = fac_e
+            #
 
             # write
             hdu_i.writeto(trimfn[i],overwrite=True)
@@ -1475,13 +1497,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
         edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         for i in range(len(fn)):
-            newcube=fits.open(montfns[i])[0].data
+            newcube=fits.open(montfns[i])[0].data / fits.open(trimfn[i])[0].header['ISS6FIX']
             newcube[~np.isfinite(newcube)]=0.
-            newcubev=fits.open(montvfns[i])[0].data
+            newcubev=fits.open(montvfns[i])[0].data / fits.open(trimvfn[i])[0].header['ISS6FIX']
             newcubev[~np.isfinite(newcubev)]=0.
-            newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+            newcubem=np.ceil(fits.open(montmfns[i])[0].data) / fits.open(trimmfn[i])[0].header['ISS6FIX']
             newcubem[~np.isfinite(newcubem)]=128
-            newcubee=fits.open(montefns[i])[0].data
+            newcubee=fits.open(montefns[i])[0].data / fits.open(trimefn[i])[0].header['ISS6FIX']
             newcubee[~np.isfinite(newcubee)]=0.
             data0[i,:,:,:]=newcube
             vdata0[i,:,:,:]=newcubev
@@ -1544,13 +1566,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             mask = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             exp = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             for i in range(len(fn)):
-                newcube=fits.open(montfns[i])[0].data
+                newcube=fits.open(montfns[i])[0].data / fits.open(trimfn[i])[0].header['ISS6FIX']
                 newcube[~np.isfinite(newcube)]=0.
-                newcubev=fits.open(montvfns[i])[0].data
+                newcubev=fits.open(montvfns[i])[0].data / fits.open(trimvfn[i])[0].header['ISS6FIX']
                 newcubev[~np.isfinite(newcubev)]=0.
-                newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+                newcubem=np.ceil(fits.open(montmfns[i])[0].data) / fits.open(trimmfn[i])[0].header['ISS6FIX']
                 newcubem[~np.isfinite(newcubem)]=128
-                newcubee=fits.open(montefns[i])[0].data
+                newcubee=fits.open(montefns[i])[0].data / fits.open(trimefn[i])[0].header['ISS6FIX']
                 newcubee[~np.isfinite(newcubee)]=0.
                 img[i,:,:]=newcube[:, :, ii]
                 var[i,:,:]=newcubev[:, :, ii]
