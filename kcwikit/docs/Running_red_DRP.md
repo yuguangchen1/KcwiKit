@@ -7,7 +7,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Running the DRP until after `intf.fits`.
 
     ```bash
-    reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st ff
+    reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st ff
     ```
 
 2. (Optional) Run the custom cosmic ray rejection. 
