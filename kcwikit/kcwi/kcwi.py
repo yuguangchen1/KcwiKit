@@ -2536,6 +2536,10 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
 
         # write plot
+        if display:
+            fig.tight_layout()
+            plt.show()
+
         fig.savefig('kcwi_astrom/'+cubefn.replace('.fits','.astrom.pdf'))
     else:
         xmax=0
