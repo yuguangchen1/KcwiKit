@@ -19,7 +19,7 @@ from multiprocessing import Pool
 def make_cube_helper(argument):
     """
     Warp each slice.
-    
+
     Helper program for threaded warping of all slices.
 
     Args:
@@ -72,10 +72,12 @@ def make_cube_helper(argument):
                      output_shape=(ysize, xsize))
     uarped = tf.warp(slice_unc, tform, order=argument['order'],
                      output_shape=(ysize, xsize))
-    marped = tf.warp(slice_msk, tform, order=1,
-                     output_shape=(ysize, xsize))
-    farped = tf.warp(slice_flg, tform, order=1,
-                     output_shape=(ysize, xsize), preserve_range=True)
+    marped = tf.warp(slice_msk, tform, order=0,
+                     output_shape=(ysize, xsize),
+                     mode='constant', cval=1)
+    farped = tf.warp(slice_flg, tform, order=0,
+                     output_shape=(ysize, xsize), preserve_range=True,
+                     mode='constant', cval=64)
 
     if slice_nsk is not None:
         karped = tf.warp(slice_nsk, tform, order=argument['order'],
@@ -246,7 +248,7 @@ class MakeCube(BasePrimitive):
             self.logger.info(f"Std. Dev. cube order = {arguments['order']}")
             self.logger.info(f"Mask cube order = 1")
             self.logger.info(f"Flag cube order = 1")
-            
+
             self.action.args.ccddata.header['WARPOD'] = arguments['order']
 
             p = Pool()
