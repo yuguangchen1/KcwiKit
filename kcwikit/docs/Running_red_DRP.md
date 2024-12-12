@@ -4,7 +4,9 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
 **Before you start**: Running the default DRP does not require to follow this instruction. Simply run ```reduce_kcwi -b -f kb*.fits -g```. 
 
-1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Running the DRP until after `intf.fits`.
+1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Adjust the parameters if needed. For example, we recommend to prioritize dome flat.
+
+    Running the DRP until after `intf.fits`.
 
     ```bash
     reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st ff
