@@ -33,6 +33,13 @@ def parser_init():
         )
     
     parser.add_argument(
+        '-s', '--sigma',
+        help='Sigma value for sigma clipping.',
+        type=float,
+        default = 3
+    )
+    
+    parser.add_argument(
         '--base_dir',
         help='Location of the raw directory',
         nargs=1,
@@ -112,7 +119,7 @@ def search_proctab(proctab, frame, target_type=None, target_group=None,
     return tab
 
 
-def create_crmsk(filename, label=[], base_dir='./', redux_dir='redux'):
+def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
     
     if isinstance(filename, list):
         filename = filename[0]
@@ -164,8 +171,8 @@ def create_crmsk(filename, label=[], base_dir='./', redux_dir='redux'):
                 ratio = np.nanmedian(img[wavemap > 0] / msci[wavemap > 0])
 
             crs = img - msci
-            crmsk = sigma_clip(crs, sigma = 3, maxiters=1, grow=2).mask.astype(float)
-            crmsk_surr = sigma_clip(crs, sigma = 3, maxiters=1, grow=10).mask.astype(float)
+            crmsk = sigma_clip(crs, sigma = sigma, maxiters=1, grow=2).mask.astype(float)
+            crmsk_surr = sigma_clip(crs, sigma = sigma, maxiters=1, grow=10).mask.astype(float)
 
             idx = np.where((crmsk < 1e-4) & (crmsk_surr > 1e-4) & (wavemap > 0) )
             with warnings.catch_warnings():
