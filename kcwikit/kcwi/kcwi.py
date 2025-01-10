@@ -725,6 +725,7 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     ax.plot(xlim, [1,1], '--', color='black')
     ax.set_yscale('log')
     ax.set_xlim(xlim)
+    plt.show()
 
     return
 
