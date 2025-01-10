@@ -1441,7 +1441,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdut=(fits.open(trimfn[i]))[0]
                 hdut.data[np.isfinite(hdut.data)==False]=0.
-                newi,newa=reproject_interp(hdut,newhdr,order=method,independent_celestial_slices=True)
+                newi,newa=reproject_interp(hdut,newhdr,order=method)#,independent_celestial_slices=True)
                 hdui=fits.PrimaryHDU(newi,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdui.writeto(montfn,overwrite=True)
@@ -1449,7 +1449,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdutv=(fits.open(trimvfn[i]))[0]
                 hdutv.data[np.isfinite(hdutv.data)==False]=0.
-                newv,newa=reproject_interp(hdutv,newhdr,order=method,independent_celestial_slices=True)
+                newv,newa=reproject_interp(hdutv,newhdr,order=method)#,independent_celestial_slices=True)
                 hduv=fits.PrimaryHDU(newv,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hduv.writeto(montvfn,overwrite=True)
@@ -1457,7 +1457,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdutm=(fits.open(trimmfn[i]))[0]
                 hdutm.data[np.isfinite(hdutm.data)==False]=0.
-                newm,newa=reproject_interp(hdutm,newhdr,order='bilinear',independent_celestial_slices=True)
+                newm,newa=reproject_interp(hdutm,newhdr,order='bilinear')#,independent_celestial_slices=True)
                 hdum=fits.PrimaryHDU(newm,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdum.writeto(montmfn,overwrite=True)
@@ -1465,7 +1465,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdute=(fits.open(trimefn[i]))[0]
                 hdute.data[np.isfinite(hdute.data)==False]=0.
-                newe,newa=reproject_interp(hdute,newhdr,order='bilinear',independent_celestial_slices=True)
+                newe,newa=reproject_interp(hdute,newhdr,order='bilinear')#,independent_celestial_slices=True)
                 hdue=fits.PrimaryHDU(newe,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdue.writeto(montefn,overwrite=True)
