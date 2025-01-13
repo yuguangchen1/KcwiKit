@@ -2430,6 +2430,8 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
 
     hdu_img0=fits.open(imgfn)[0]
+    if hdu_img0.data is None:
+        hdu_img0 = fits.open(imgfn)[1]
     img0=hdu_img0.data.T
     hdr0=hdu_img0.header
 
