@@ -1058,14 +1058,21 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         prera=pre_tab['col2']
         predec=pre_tab['col3']
 
+    astrom_rashift = np.zeros(len(fn))
+    astrom_decshift = np.zeros(len(fn))
     if use_astrom:
         astrom_tab=ascii.read(fnlist.replace('.list','.astrom.list'))
-        astrom_rashift=astrom_tab['col1'][0]
-        astrom_decshift=astrom_tab['col2'][0]
+        if len(astrom_tab)==2:
+            astrom_rashift[:] = astrom_tab['col1'][0]
+            astrom_decshift[:] = astrom_tab['col2'][0]
+        else:
+            # figure out which is which
+            astrom_basenames = np.array([os.path.basename(row['col1'])+'_icubes.fits' for row in astrom_tab])
+            for i in range(len(fn)):
+                index = (astrom_basenames == os.path.basename(fn[i]))
+                astrom_rashift[i] = astrom_tab['col2'][index][0]
+                astrom_decshift[i] = astrom_tab['col3'][index][0]
         overwrite=True
-    else:
-        astrom_rashift=0.
-        astrom_decshift=0.
 
     # flux weight
     if fluxfn=='':
@@ -1289,17 +1296,17 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
             # astrometry correction
             if use_astrom:
-                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift/3600.
-                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift/3600.
+                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift/3600.
-                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift/3600.
+                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift/3600.
-                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift/3600.
+                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift/3600.
-                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift/3600.
+                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift[i]/3600.
 
             # shift
             hdu_i.header['CRPIX1']=hdu_i.header['CRPIX1']+xshift[i]
