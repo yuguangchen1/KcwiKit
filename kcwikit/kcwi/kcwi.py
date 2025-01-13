@@ -2273,7 +2273,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
     conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
-    save_shift=False,interp_order='bilinear'):
+    save_shift=False,interp_order='bilinear',background_subtraction=False,
+    background_kcwi=0., background_ref=0.):
 
     """
     Conduct astrometry correction of the stacked cube by cross-correlating the
@@ -2428,12 +2429,17 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             if np.sum(q)>0:
                 img[ii,jj]=np.mean(cube[ii,jj,qwave][q])
 
+    if background_subtraction:
+        img = img - background_kcwi
 
     hdu_img0=fits.open(imgfn)[0]
     if hdu_img0.data is None:
         hdu_img0 = fits.open(imgfn)[1]
     img0=hdu_img0.data.T
     hdr0=hdu_img0.header
+
+    if background_subtraction:
+        img0 = img0 - background_ref
 
 
     if nocrl==0:
