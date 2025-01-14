@@ -2100,7 +2100,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
                 # find closest local maximum
                 max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
-                maxima=(crls==max_conv)
+                maxima=(crls==max_conv) & (crls != 0)
                 labeled, num_objects=ndimage.label(maxima)
                 slices=ndimage.find_objects(labeled)
                 xindex,yindex=[],[]
@@ -2436,8 +2436,10 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             if np.sum(q)>0:
                 img[ii,jj]=np.mean(cube[ii,jj,qwave][q])
 
+    img_withbkg = img.copy()
     if background_subtraction:
         img = img - background_kcwi
+        img[img < 0] = 0
 
     hdu_img0=fits.open(imgfn)[0]
     if hdu_img0.data is None:
@@ -2447,6 +2449,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
     if background_subtraction:
         img0 = img0 - background_ref
+        img0[img0 < 0] = 0
 
 
     if nocrl==0:
@@ -2484,7 +2487,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         plt.pcolormesh(xplot,yplot,crls.T)
 
         max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
-        maxima=(crls==max_conv)
+        maxima=(crls==max_conv) & (crls != 0)
         labeled, num_objects=ndimage.label(maxima)
         slices=ndimage.find_objects(labeled)
         xindex,yindex=[],[]
@@ -2565,7 +2568,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     hdr_best=hdr_img.copy()
     hdr_best['CRPIX1']=hdr_img['CRPIX1']+xmax
     hdr_best['CRPIX2']=hdr_img['CRPIX2']+ymax
-    hdu_best=fits.PrimaryHDU(img.T,header=hdr_best)
+    hdu_best=fits.PrimaryHDU(img_withbkg.T, header=hdr_best)
     hdu_best.writeto('kcwi_astrom/'+cubefn.replace('.fits','.thum.fits'),overwrite=True)
 
     hdu_cube.header['CRPIX1']+=xmax
