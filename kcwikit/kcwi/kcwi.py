@@ -1062,7 +1062,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     astrom_decshift = np.zeros(len(fn))
     if use_astrom:
         astrom_tab=ascii.read(fnlist.replace('.list','.astrom.list'))
-        if len(astrom_tab)==2:
+        if len(astrom_tab.colnames)==2:
             astrom_rashift[:] = astrom_tab['col1'][0]
             astrom_decshift[:] = astrom_tab['col2'][0]
         else:
