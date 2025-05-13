@@ -183,11 +183,13 @@ def kcwi_medfilter_actonone(args, par):
         # read masks
         if os.path.isfile(mimgfn1):
             mimg1 = fits.open(mimgfn1)[0].data
+            print("Continuum mask found: ", mimgfn1)
         else:
             mimg1 = np.zeros(shape)
 
         if os.path.isfile(mimgfn2):
             mimg2 = fits.open(mimgfn2)[0].data
+            print("Line mask found: ", mimgfn1)
         else:
             mimg2 = None
 
