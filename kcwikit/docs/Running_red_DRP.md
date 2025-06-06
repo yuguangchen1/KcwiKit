@@ -29,7 +29,8 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     kcrm_create_crmsk kcrm_<night>.json
     ```
     This creates `*crmsk.fits` for each frame as cosmic-ray masks. Remove all the science frames in the `kcwir.proc` table. For example, for ```kr240211_00089``` frame, remove the following lines. 
-    **Note: If you are dealing with bright point-like target (e.g. QSOs) it is highly recommended to inspect the generated _crmsk files to avoid false positives from QSO continuum/broad line** 
+    **Note: If you are dealing with bright point-like target (e.g. QSOs) it is highly recommended to inspect the generated _crmsk files to avoid false positives from QSO continuum/broad line**
+    If you did get false positives, open the crmsk with ds9, create regions covering the false positives, and name it as, e.g., kr240902_00158_crmsk_recover.reg. The KcwiKit version DRP should identify the region and remove it from CR mask.
     ```
     |      89 | 65c6d022d14508b9bd6870ea | 2201009 |   OBJECT |  2024-02-11-89 |   15.0 | RED | Medium |   RL |   28.52 |  4499.90 | 2,2 | KBlue |    60351.382006 |     5 |  intf | kb240211_00089.fits |      sdss08579 | kr240211_00089.fits |
     ```
@@ -39,7 +40,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st 2
     ```
 
-3. (opitonal) Running the median filtering.
+4. (opitonal) Running the median filtering.
    **Note: This is not an optional step if you are dealing with bright point-like target due to the diffraction spikes** 
 
     Create white-light and 2D-flattened images for `icube.fits` files. 
