@@ -129,7 +129,6 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
     
     if display:
         print(t)
-    import pickle; pickle.dump(t, open('tmp.pickle', 'wb'))
 
     t.write(outfile, overwrite=True, format='csv')
 

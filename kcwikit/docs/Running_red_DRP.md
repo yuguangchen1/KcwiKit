@@ -4,7 +4,9 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
 **Before you start**: Running the default DRP does not require to follow this instruction. Simply run ```reduce_kcwi -b -f kb*.fits -g```. 
 
-1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Running the DRP until after `intf.fits`.
+1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Adjust the parameters if needed. For example, we recommend to prioritize dome flat.
+
+    Running the DRP until after `intf.fits`.
 
     ```bash
     reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st ff
@@ -31,6 +33,22 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     This creates `*crmsk.fits` for each frame as cosmic-ray masks. Remove all the science frames in the `kcwir.proc` table. For example, for ```kr240211_00089``` frame, remove the following lines. 
     **Note: If you are dealing with bright point-like target (e.g. QSOs) it is highly recommended to inspect the generated _crmsk files to avoid false positives from QSO continuum/broad line**
     If you did get false positives, open the crmsk with ds9, create regions covering the false positives, and name it as, e.g., kr240902_00158_crmsk_recover.reg. The KcwiKit version DRP should identify the region and remove it from CR mask.
+
+    This creates `*crmsk.fits` for each frame as cosmic-ray masks. 
+    <details>
+    <summary>(tips) Recover masked pixels </summary>
+
+    For bright continuum or emission line objects, the cosmic-ray rejection method may mistakenly identify those as cosmic rays. A quickest fix is to
+    specify the number of sigmas in sigma clipping. 
+    ```bash
+    kcrm_create_crmsk kcrm_<night>.json -s <sigma>
+    ```
+    The default is `3`. If this failed, you can recover some pixels manually by setting up a `region` file with a file name of `kr<date>_<frame>_crmask_recover.reg`. 
+    The regions files will be automatically identified and the pixels inside the regions will be recovered.
+    </details>
+    
+    Remove all the science frames in the `kcwib.proc` table. For example, for ```kr240211_00089``` frame, remove the following lines. 
+
     ```
     |      89 | 65c6d022d14508b9bd6870ea | 2201009 |   OBJECT |  2024-02-11-89 |   15.0 | RED | Medium |   RL |   28.52 |  4499.90 | 2,2 | KBlue |    60351.382006 |     5 |  intf | kb240211_00089.fits |      sdss08579 | kr240211_00089.fits |
     ```

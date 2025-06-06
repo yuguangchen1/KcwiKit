@@ -67,6 +67,13 @@ Generate a `csv` file containing the important header information of FITS files.
 - '-b --BLUE' - only perform on the blue channel data
 - '-d --display' - print the table
 
+## kcwi_makemask
+```bash
+kcwi_makemask [dir]
+```
+Generate FITS masks from then DS9 region files for sky subtraction. This script is a wrapper for `kcwi_masksky_ds9`. 
+- `dir` - diretory of which all `*.reg` will be converted. Default is `./`.
+
 ## kcwi_makemask_medfilter
 ```bash
 kcwi_makemask_medfilter [dir] [-d]

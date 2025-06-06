@@ -747,6 +747,7 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     ax.plot(xlim, [1,1], '--', color='black')
     ax.set_yscale('log')
     ax.set_xlim(xlim)
+    plt.show()
 
     return
 
@@ -1086,14 +1087,21 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
         prera=pre_tab['col2']
         predec=pre_tab['col3']
 
+    astrom_rashift = np.zeros(len(fn))
+    astrom_decshift = np.zeros(len(fn))
     if use_astrom:
         astrom_tab=ascii.read(fnlist.replace('.list','.astrom.list'))
-        astrom_rashift=astrom_tab['col1'][0]
-        astrom_decshift=astrom_tab['col2'][0]
+        if len(astrom_tab.colnames)==2:
+            astrom_rashift[:] = astrom_tab['col1'][0]
+            astrom_decshift[:] = astrom_tab['col2'][0]
+        else:
+            # figure out which is which
+            astrom_basenames = np.array([os.path.basename(row['col1'])+'_icubes.fits' for row in astrom_tab])
+            for i in range(len(fn)):
+                index = (astrom_basenames == os.path.basename(fn[i]))
+                astrom_rashift[i] = astrom_tab['col2'][index][0]
+                astrom_decshift[i] = astrom_tab['col3'][index][0]
         overwrite=True
-    else:
-        astrom_rashift=0.
-        astrom_decshift=0.
 
     # flux weight
     if fluxfn=='':
@@ -1138,7 +1146,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
     hdr0['CD2_1']=0
     #hdr0['CTYPE3']='WAVE'
     #hdr0['BUNIT']='10^(-16)erg/s/cm2/Angstrom'
-    hdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
+    hdr0['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
     if suffix!='cubes':
         #hdr0['BUNIT']='adu/s'
         hdr0['BUNIT']='count/s/arcsec2'
@@ -1294,8 +1302,8 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
             else:
                 hdu_i.data=hdu_i.data/area
                 hdu_v.data=hdu_v.data/area**2
-                hdu_i.header['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
-                hdu_v.header['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+                hdu_i.header['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
+                hdu_v.header['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
 
 
             # preshift
@@ -1318,17 +1326,17 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
 
             # astrometry correction
             if use_astrom:
-                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift/3600.
-                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift/3600.
+                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift/3600.
-                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift/3600.
+                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift/3600.
-                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift/3600.
+                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift/3600.
-                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift/3600.
+                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift[i]/3600.
 
             # shift
             hdu_i.header['CRPIX1']=hdu_i.header['CRPIX1']+xshift[i]
@@ -1416,6 +1424,28 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
                     hdu_m = kcwi_resample_wave(hdu_m, hdr0, method='mask')
                     hdu_e = kcwi_resample_wave(hdu_e, hdr0, method='linear')
 
+            # Hot fix for issue #6
+            dtype = np.int32
+            try:
+                oflow_limit = np.iinfo(dtype).max
+            except:
+                oflow_limit = np.finfo(dtype).max
+
+            fac_i = np.float64(oflow_limit) / np.nanmax(hdu_i.data) / 100
+            fac_v = np.float64(oflow_limit) / np.nanmax(hdu_v.data) / 100
+            fac_m = np.float64(oflow_limit) / np.nanmax(hdu_m.data) / 100
+            fac_e = np.float64(oflow_limit) / np.nanmax(hdu_e.data) / 100
+
+            hdu_i.data = (hdu_i.data * fac_i).astype(dtype)
+            hdu_v.data = (hdu_v.data * fac_v).astype(dtype)
+            hdu_m.data = (hdu_m.data * fac_m).astype(dtype)
+            hdu_e.data = (hdu_e.data * fac_e).astype(dtype)
+
+            hdu_i.header['ISS6FIX'] = fac_i
+            hdu_v.header['ISS6FIX'] = fac_v
+            hdu_m.header['ISS6FIX'] = fac_m
+            hdu_e.header['ISS6FIX'] = fac_e
+            #
 
             # write
             hdu_i.writeto(trimfn[i],overwrite=True)
@@ -1449,6 +1479,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
                 hdut=(fits.open(trimfn[i]))[0]
                 hdut.data[np.isfinite(hdut.data)==False]=0.
                 newi,newa=reproject_interp(hdut,newhdr,order=method)
+
                 hdui=fits.PrimaryHDU(newi,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdui.writeto(montfn,overwrite=True)
@@ -1457,6 +1488,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
                 hdutv=(fits.open(trimvfn[i]))[0]
                 hdutv.data[np.isfinite(hdutv.data)==False]=0.
                 newv,newa=reproject_interp(hdutv,newhdr,order=method)
+
                 hduv=fits.PrimaryHDU(newv,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hduv.writeto(montvfn,overwrite=True)
@@ -1465,6 +1497,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
                 hdutm=(fits.open(trimmfn[i]))[0]
                 hdutm.data[np.isfinite(hdutm.data)==False]=0.
                 newm,newa=reproject_interp(hdutm,newhdr,order='bilinear')
+
                 hdum=fits.PrimaryHDU(newm,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdum.writeto(montmfn,overwrite=True)
@@ -1473,6 +1506,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
                 hdute=(fits.open(trimefn[i]))[0]
                 hdute.data[np.isfinite(hdute.data)==False]=0.
                 newe,newa=reproject_interp(hdute,newhdr,order='bilinear')
+
                 hdue=fits.PrimaryHDU(newe,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdue.writeto(montefn,overwrite=True)
@@ -1505,13 +1539,13 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
         mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
         edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         for i in range(len(fn)):
-            newcube=fits.open(montfns[i])[0].data
+            newcube=fits.open(montfns[i])[0].data / fits.open(trimfn[i])[0].header['ISS6FIX']
             newcube[~np.isfinite(newcube)]=0.
-            newcubev=fits.open(montvfns[i])[0].data
+            newcubev=fits.open(montvfns[i])[0].data / fits.open(trimvfn[i])[0].header['ISS6FIX']
             newcubev[~np.isfinite(newcubev)]=0.
-            newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+            newcubem=np.ceil(fits.open(montmfns[i])[0].data) / fits.open(trimmfn[i])[0].header['ISS6FIX']
             newcubem[~np.isfinite(newcubem)]=128
-            newcubee=fits.open(montefns[i])[0].data
+            newcubee=fits.open(montefns[i])[0].data / fits.open(trimefn[i])[0].header['ISS6FIX']
             newcubee[~np.isfinite(newcubee)]=0.
             data0[i,:,:,:]=newcube
             vdata0[i,:,:,:]=newcubev
@@ -1574,13 +1608,13 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
             mask = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             exp = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             for i in range(len(fn)):
-                newcube=fits.open(montfns[i])[0].data
+                newcube=fits.open(montfns[i])[0].data / fits.open(trimfn[i])[0].header['ISS6FIX']
                 newcube[~np.isfinite(newcube)]=0.
-                newcubev=fits.open(montvfns[i])[0].data
+                newcubev=fits.open(montvfns[i])[0].data / fits.open(trimvfn[i])[0].header['ISS6FIX']
                 newcubev[~np.isfinite(newcubev)]=0.
-                newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+                newcubem=np.ceil(fits.open(montmfns[i])[0].data) / fits.open(trimmfn[i])[0].header['ISS6FIX']
                 newcubem[~np.isfinite(newcubem)]=128
-                newcubee=fits.open(montefns[i])[0].data
+                newcubee=fits.open(montefns[i])[0].data / fits.open(trimefn[i])[0].header['ISS6FIX']
                 newcubee[~np.isfinite(newcubee)]=0.
                 img[i,:,:]=newcube[:, :, ii]
                 var[i,:,:]=newcubev[:, :, ii]
@@ -1665,7 +1699,7 @@ def kcwi_stack_yd(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixs
     vhdr0=hdr0.copy()
     if suffix=='cubes':
         #vhdr0['BUNIT']='10^(-32)erg2/s2/cm4/Angstrom2'
-        vhdr0['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+        vhdr0['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
     else:
         #vhdr0['BUNIT']='adu2/s2'
         vhdr0['BUNIT']='count2/s2/arcsec4'
@@ -2923,7 +2957,7 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
                 # find closest local maximum
                 max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
-                maxima=(crls==max_conv)
+                maxima=(crls==max_conv) & (crls != 0)
                 labeled, num_objects=ndimage.label(maxima)
                 slices=ndimage.find_objects(labeled)
                 xindex,yindex=[],[]
@@ -3103,7 +3137,8 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
     conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
-    save_shift=False,interp_order='bilinear',nhdu=0):
+    save_shift=False,interp_order='bilinear',background_subtraction=False,
+    background_kcwi=0., background_ref=0.,nhdu=0):
 
     """
     Conduct astrometry correction of the stacked cube by cross-correlating the
@@ -3258,10 +3293,19 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
             if np.sum(q)>0:
                 img[ii,jj]=np.mean(cube[ii,jj,qwave][q])
 
+    img_withbkg = img.copy()
+    if background_subtraction:
+        img = img - background_kcwi
+        img[img < 0] = 0
 
     hdu_img0=fits.open(imgfn)[nhdu]
+
     img0=hdu_img0.data.T
     hdr0=hdu_img0.header
+
+    if background_subtraction:
+        img0 = img0 - background_ref
+        img0[img0 < 0] = 0
 
 
     if nocrl==0:
@@ -3299,7 +3343,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         plt.pcolormesh(xplot,yplot,crls.T)
 
         max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
-        maxima=(crls==max_conv)
+        maxima=(crls==max_conv) & (crls != 0)
         labeled, num_objects=ndimage.label(maxima)
         slices=ndimage.find_objects(labeled)
         xindex,yindex=[],[]
@@ -3367,6 +3411,10 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
 
 
         # write plot
+        if display:
+            fig.tight_layout()
+            plt.show()
+
         fig.savefig('kcwi_astrom/'+cubefn.replace('.fits','.astrom.pdf'))
     else:
         xmax=0
@@ -3376,7 +3424,7 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
     hdr_best=hdr_img.copy()
     hdr_best['CRPIX1']=hdr_img['CRPIX1']+xmax
     hdr_best['CRPIX2']=hdr_img['CRPIX2']+ymax
-    hdu_best=fits.PrimaryHDU(img.T,header=hdr_best)
+    hdu_best=fits.PrimaryHDU(img_withbkg.T, header=hdr_best)
     hdu_best.writeto('kcwi_astrom/'+cubefn.replace('.fits','.thum.fits'),overwrite=True)
 
     hdu_cube.header['CRPIX1']+=xmax

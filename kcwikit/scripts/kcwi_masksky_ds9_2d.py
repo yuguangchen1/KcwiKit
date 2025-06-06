@@ -1,96 +1,95 @@
 #!/usr/bin/env python
 
-"""Creates mask image from ds9 region file.
+from astropy.io import fits as pf
+from regions import Regions
 
-Args:
-    imagename (string): The name of a *_intf.fits image
-    regionname (string): The name of a ds9 region file
-
-Returns:
-    None
-
-Note:
-    To use this routine, process your data with kcwi_stage4flat.pro.
-    Then display the target *_intf.fits file in ds9.
-    Use region shapes to indicate non-sky pixels in image (box, circle, etc.).
-    Write out ds9 region file (*.reg).
-    Run this routine:
-
-    python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111_intf.fits ds9.reg
-
-    (replace paths/filenames with your local paths/filenames)
-
-    This should create kb180101_00111_smsk.fits, which will be used when you
-    run kcwi_stage5sky.pro.
-"""
-try:
-    import astropy
-except ImportError:
-    print("Please install astropy: required for image I/O")
-    quit()
-try:
-    import pyregion
-except ImportError:
-    print("Please install pyregion: required for DS9 region I/O")
-    quit()
 import numpy as np
 import sys
 import os
-import pdb
 
-# check args
-narg=len(sys.argv)
+def main():
 
-# should be three (including routine name)
-if narg != 3:
-    print("Usage: python kcwi_masksky_ds9.py <imagename> <regionname>")
-    print("imagename : used for array dimensions and filename purposes, ")
-    print("            must be an _intf image.")
-    print("regionname: name of region file containing ds9 mask regions")
-    print("            (typically a .reg)")
-    exit()
+    """Creates mask image from ds9 region file.
 
-# read arg values
-imfname=sys.argv[1]
-regfname=sys.argv[2]
+    Args:
+        imagename (string): The name of a *_icube_2d.fits image
+        regionname (string): The name of a ds9 region file
 
-# make sure it's an _intf image
-#if '_intf.fits' not in imfname:
-#    print("imagename must be _intf.fits image")
-#    exit()
+    Returns:
+        None
 
-# do inputs exist?
-if os.path.exists(imfname) == False:
-    print("File does not exist: "+imfname)
-    exit()
+    Note:
+        To use this routine, create flattened data cubes with `kcwi_flatten_cube`.
+        Then display the target *_icube_2d.fits file in ds9.
+        Use region shapes to indicate non-sky pixels in image (box, circle, etc.).
+        Write out ds9 region file (*.reg).
+        Run this routine:
 
-if os.path.exists(regfname) == False:
-    print("File does not exist: "+regfname)
-    exit()
+        kcwi_masksky_ds9_2d.py kb180101_00111_icube_2d.fits ds9.reg
 
-# create output mask image name
-outfile=imfname.replace(".fits", ".mask.fits")
-print("Creating: "+outfile)
+        (replace paths/filenames with your local paths/filenames)
 
-# load the header from the pointed-to image.
-hdu_list = astropy.io.fits.open(imfname)
-header= hdu_list[0].header
+        This should create kb180101_00111_icube_2d.mask.fits, which will be used 
+        for median fitlering
+    """
 
-# determine the size of the array
-shape = (header["NAXIS1"], header["NAXIS2"])
+    # check args
+    narg=len(sys.argv)
 
-try:
-    # load in the region file
-    r = pyregion.open(regfname).as_imagecoord(header)
-except ValueError:
-    print('Region File is Empty (contains no objects)')
-    sys.exit(1)
+    # should be three (including routine name)
+    if narg != 3:
+        print("Usage: python kcwi_masksky_ds9_2d.py <imagename> <regionname>")
+        print("imagename : used for array dimensions and filename purposes, ")
+        print("            must be an _icube_2d image.")
+        print("regionname: name of region file containing ds9 mask regions")
+        print("            (typically a .reg)")
+        exit()
 
-m = r.get_mask(hdu=hdu_list[0])
-#pdb.set_trace()
+    # read arg values
+    imfname=sys.argv[1]
+    regfname=sys.argv[2]
 
-# write out the mask
-hdu = astropy.io.fits.PrimaryHDU(np.uint8(m))
-hdu.writeto(outfile, overwrite=True)
+    # do inputs exist?
+    if os.path.exists(imfname) == False:
+        print("File does not exist: "+imfname)
+        exit()
 
-print("Done.")
+    if os.path.exists(regfname) == False:
+        print("File does not exist: "+regfname)
+        exit()
+
+    # create output mask image name
+    outfile=imfname.replace(".fits", ".mask.fits")
+    print("Creating: "+outfile)
+
+    # load the header from the pointed-to image.
+    hdu_list = pf.open(imfname)
+    header= hdu_list[0].header
+    shape = hdu_list[0].shape
+
+    # load the region file
+    with open(regfname, 'r') as f:
+        # Read it out as a string
+        regstr = f.read()
+        
+        # Check if the region file is in physical coordinates
+        if 'physical' in regstr:
+            print("[Warning] 'physical' coordinates not supported by regions. Replacing with 'image'")
+            regstr = regstr.replace('physical', 'image')
+
+        r = Regions.parse(regstr, format='ds9')
+        mask = None
+        for region in r.regions:
+            if mask is None:
+                mask = region.to_mask().to_image(shape).astype(bool)
+            else:
+                mask = mask | region.to_mask().to_image(shape).astype(bool)
+
+    # write out the mask
+    hdu = pf.PrimaryHDU(np.uint8(mask))
+    hdu.writeto(outfile, overwrite=True)
+
+    print("Done.")
+
+if __name__ == "__main__":
+    main()

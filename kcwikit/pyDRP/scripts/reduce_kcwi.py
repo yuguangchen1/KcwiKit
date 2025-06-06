@@ -104,7 +104,7 @@ def _parse_arguments(in_args: list) -> argparse.Namespace:
                         default=False, help="KCWI Red processing")
     parser.add_argument("-k", "--skipsky", dest='skipsky', action="store_true",
                         default=False, help="Skip sky subtraction")
-    
+
     # breaking reduction into stages
     parser.add_argument('-st', '--stage', dest='stage',
                         help='Which stage of the reduction are we in?',
@@ -158,7 +158,7 @@ def main():
         for in_frame in in_subset.index:
             arguments = Arguments(name=in_frame)
             framework.append_event('next_file', arguments, recurrent=True)
-    
+
     def process_list(in_list):
         for in_frame in in_list:
             arguments = Arguments(name=in_frame)
@@ -245,6 +245,9 @@ def main():
     elif args.stage == 'ff':
         from kcwidrp.pipelines.kcwi_pipeline_ff import Kcwi_pipeline
         print("Running IDL stage 1-4 until intf")
+    elif args.stage == 'cr':
+        from kcwidrp.pipelines.kcwi_pipeline_cr import Kcwi_pipeline
+        print("Running IDL stage 1 until CRR")
     else:
         from kcwidrp.pipelines.kcwi_pipeline import Kcwi_pipeline
         print("Invalid stage choice [0..3]: going with default (full) reduction")

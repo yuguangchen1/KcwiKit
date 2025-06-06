@@ -6,6 +6,8 @@ from astroscrappy import detect_cosmics
 import os
 from astropy.io import fits
 
+from regions import Regions
+
 
 class RemoveCosmicRays(BasePrimitive):
     """
@@ -143,6 +145,35 @@ class RemoveCosmicRays(BasePrimitive):
 
                 self.logger.info("CR mask cleaned cosmic rays")
                 header['history'] = f"{crmskName} cleaned cosmic rays"
+
+                # have recovery file?
+                crmskRecName = self.action.args.name.replace('.fits', '_crmsk_recover.reg')
+                if os.path.isfile(f"{self.config.instrument.output_directory}/{crmskRecName}"):
+                    self.logger.info(f'CR mask recoverty file detected, opening {crmskRecName}')
+                    # load the region file
+                    with open(f"{self.config.instrument.output_directory}/{crmskRecName}", 'r') as f:
+                        # Read it out as a string
+                        regstr = f.read()
+                        
+                        # Check if the region file is in physical coordinates
+                        if 'physical' in regstr:
+                            self.logger.info("[Warning] 'physical' coordinates detected in the recovery file. Replacing with 'image'")
+                            regstr = regstr.replace('physical', 'image')
+
+                        r = Regions.parse(regstr, format='ds9')
+                        crRec = None
+                        for region in r.regions:
+                            if crRec is None:
+                                crRec = region.to_mask().to_image(crmsk.shape).astype(bool)
+                            else:
+                                crRec = crRec | region.to_mask().to_image(crmsk.shape).astype(bool)
+                    
+                    if crRec is not None:
+                        Ncr = np.sum(crmsk)
+                        NcrRec = np.sum((crmsk != 0) & crRec)
+                        crmsk[crRec] = 0
+                        self.logger.info(f"Recovered {NcrRec}/{Ncr} CR pixels")
+                        header['history'] = f"{crmskRecName} recovered cosmic rays"
 
                 self.action.args.ccddata.flags[crmsk > 1e-3] += 4
 
