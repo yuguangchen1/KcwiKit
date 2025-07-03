@@ -41,6 +41,11 @@ def parser_init():
         action='store_true'
         )
     parser.add_argument(
+        '-b', '--blue',
+        help='process blue channel',
+        action='store_true'
+        )
+    parser.add_argument(
         '--redux_dir',
         help='Location of the redux directory',
         nargs=1,
@@ -49,7 +54,7 @@ def parser_init():
     return parser
 
 
-def group_frames(logfile, outfile, continuous=False, display=False, check_int=False, redux_dir = './redux'):
+def group_frames(logfile, outfile, continuous=False, display=False, check_int=False,blue=False, redux_dir = './redux'):
     # group frames based on PA
 
     if isinstance(logfile, list):
@@ -59,7 +64,10 @@ def group_frames(logfile, outfile, continuous=False, display=False, check_int=Fa
         outfile = outfile[0]
 
     log = ascii.read(logfile, format = 'csv')
-    kcrm = log[log['Camera'] == 'RED']
+    if blue:
+        kcrm = log[log['Camera'] == 'BLUE']
+    else:
+        kcrm = log[log['Camera'] == 'RED']
 
     kcrm.show_in_notebook()
 
@@ -67,8 +75,8 @@ def group_frames(logfile, outfile, continuous=False, display=False, check_int=Fa
 
     for i, row in enumerate(kcrm):
 
-        if row['Camera'] != 'RED':
-            continue
+        #if row['Camera'] != 'RED':
+        #    continue
 
         if row['ImType'] != 'OBJECT':
             continue

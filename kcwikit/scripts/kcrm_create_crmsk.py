@@ -12,7 +12,7 @@ from astropy.table import Table
 from astropy.io import fits
 import re
 import warnings
-from astropy.stats import sigma_clip
+from astropy.stats import sigma_clip,sigma_clipped_stats
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -169,10 +169,14 @@ def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 ratio = np.nanmedian(img[wavemap > 0] / msci[wavemap > 0])
+            #    _,ratio,__=sigma_clipped_stats(img[wavemap > 0] / msci[wavemap > 0], sigma = 3, maxiters=1,grow=2)
 
-            crs = img - msci
-            crmsk = sigma_clip(crs, sigma = sigma, maxiters=1, grow=2).mask.astype(float)
-            crmsk_surr = sigma_clip(crs, sigma = sigma, maxiters=1, grow=10).mask.astype(float)
+            crs = img - msci#*ratio
+            #print("rescaling msci by a factor of %f"%ratio)
+            crs_ratio=np.abs((img - msci)/msci)
+            crmsk = (sigma_clip(crs, sigma = 3, maxiters=1, grow=2).mask & (crs_ratio>0.6)).astype(float)
+            crmsk_surr = sigma_clip(crs, sigma = 3, maxiters=1, grow=10).mask.astype(float)
+
 
             idx = np.where((crmsk < 1e-4) & (crmsk_surr > 1e-4) & (wavemap > 0) )
             with warnings.catch_warnings():

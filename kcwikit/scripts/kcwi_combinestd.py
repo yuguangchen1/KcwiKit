@@ -149,7 +149,7 @@ def combinestd(listfile, noplot=False):
                 if len(data) > 5:
                     invsens_5 = data[5, :]
                 else:
-                    invsens_5 = np.zerors(len(wave0)) + np.nan
+                    invsens_5 = np.zeros(len(wave0)) + np.nan
 
         # Plot
         if not noplot:

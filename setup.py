@@ -32,7 +32,9 @@ entry_points = {
         "kcwi_masksky_ds9_thum = kcwikit.scripts.kcwi_masksky_ds9_thum:main",
         "kcwi_masksky_ds9_zap = kcwikit.scripts.kcwi_masksky_ds9_zap:main",
         "kcwi_masksky_ds9 = kcwikit.scripts.kcwi_masksky_ds9:main",
-        "kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main"
+        "kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main",
+        "kcwi_masksky_ds9_bcrr = kcwikit.scripts.kcwi_masksky_ds9_bcrr:main",
+        "kcwi_gen_skyfile = kcwikit.scripts.kcwi_gen_skyfile:main"
     ]
 }
 

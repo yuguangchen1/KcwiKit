@@ -786,7 +786,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],all_mask)
 
     hdu0_mask=hdu0.copy()
-    hdu0_mask.data[mask_3d==True]=0
+    hdu0_mask.data[mask_3d==True]=np.nan
 
 
 

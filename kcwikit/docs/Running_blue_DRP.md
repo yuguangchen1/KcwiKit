@@ -27,8 +27,17 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     ```bash
     reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 2
     ```
+3. (optional) Check for possible CR rejection false positives
+   It is very common for the current DRP to mistakenly consider bright continuum sources or strong emission lines as cosmic rays, if the count rate surpasses $\simeq$2000. Fortunately, it is easy to identify the fake positives from icube.fits.
 
-4. (optional) Running the median filtering. 
+   Open the icube file and inspect the FLAGS extension. If there are values greater than 3 clustering around the QSO, then it is most likely CR false positives.
+
+   To fix this problem, open the corresponding intf file, create region masks covering the continuum/strong lines, and use kcwi_masksky_ds9_bcrr to convert them into FITS masks:
+   ```bash
+   kcwi_masksky_ds9_bcrr kb250421_00030_intf.fits kb250421_00030.reg
+   ```
+   You also have to set bcrmsk=True in the .cfg file
+4. (optional) Running the median filtering.
 
     Create white-light and 2D-flattened images for `icube.fits` files. 
 
@@ -45,7 +54,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     ```
     See [kcwi_medfilter](../docs/scripts_instruction.md) instructions for details to run and configure the parameters. 
 
-5. Once again remove all the science entries in `kcwib.proc`. Run the DRP to the end. 
+5. Once again remove all the science entries in `kcwib.proc`. Run the DRP to the end.
 
     ```bash
     reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 3
