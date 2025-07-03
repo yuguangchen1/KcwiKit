@@ -132,6 +132,14 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
 
     t.write(outfile, overwrite=True, format='csv')
 
+    df = t.to_pandas()
+    df_html = df.to_html(classes='table table-light table-striped-columns table-hover')
+    styled_html= f'''<html><head><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous"></head><body>{df_html}</body></html>'''
+    with open(outfile + '.html', 'w') as f:
+        f.write(styled_html)
+
+
+
 
 def main():
     arg_parser = parser_init()
