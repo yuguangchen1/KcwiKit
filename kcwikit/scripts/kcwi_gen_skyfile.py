@@ -33,23 +33,13 @@ def parser_init():
         required=False
         )
     parser.add_argument(
-        '-r', '--RED',
-        help='Red channel only.',
-        action='store_true'
-        )
-    parser.add_argument(
-        '-b', '--BLUE',
-        help='Blue channel only.',
-        action='store_true'
-        )
-    parser.add_argument(
         '-d', '--display',
         help='Print table',
         action='store_true'
         )
     return parser
 
-def create_log(outfile, filename=[], RED=False, BLUE=False, display=False,referencelog=[]):
+def create_log(outfile, filename=[], display=False,referencelog=[]):
     
     if not isinstance(filename, list):
         filename = [filename]
@@ -63,8 +53,8 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False,refere
     nos = []
     skyframe = []
     skymask = []
-    #if RED:
     obj_dict = json.load(open(referencelog, 'r'))
+    # select only groups with "sky" in the name
     selected_keys = [k for k in obj_dict.keys() if "sky" in k]
     for obj in list(obj_dict.keys()):
         if obj+"_sky" in selected_keys:
@@ -75,7 +65,8 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False,refere
             nos.append(fn)
             if sky_group is not None:
                 skyframe.append(sky_group[0])
-                skymask.append('')
+                skymask.append('') #do not use skymask when using external sky frame per KCWI pipeline instructions
+                #skymask.append(re.sub(".fits","_smsk.fits",sky_group[0]))
             else:
                 skyframe.append(fn)
                 skymask.append(re.sub(".fits","_smsk.fits",obj_dict[obj][0]))
