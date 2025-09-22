@@ -189,7 +189,7 @@ def kcwi_medfilter_actonone(args, par):
 
         if os.path.isfile(mimgfn2):
             mimg2 = fits.open(mimgfn2)[0].data
-            print("Line mask found: ", mimgfn1)
+            print("Line mask found: ", mimgfn2)
         else:
             mimg2 = None
 
@@ -352,8 +352,8 @@ def kcwi_medfilter_actonone(args, par):
                         flagline[q100[q]] = -200
 
                         q100 = np.where(flagline == -100)[0]
-                        # need >= 4 good values for cubic spline
-                        if np.sum(qv) > 3:
+                        # need >= 10 good values for cubic spline
+                        if np.sum(qv) > 9:
                             cs = CubicSpline(np.where(qv)[0], line[qv])
                             line0[q100] = cs(q100)
                         else:
@@ -435,6 +435,14 @@ def kcwi_medfilter_actonone(args, par):
         # Median cube
         hdu_med = fits.PrimaryHDU(medcube, header=hdr)
         hdu_med.writeto(par['fn'].replace('.fits', '.med.fits'), overwrite=True)
+
+        # diagnostic cube
+        #hdu_flag = fits.PrimaryHDU(flagcube, header=hdr)
+        #hdu_flag.writeto(par['fn'].replace('.fits', '.medflag.fits'), overwrite=True)
+
+        #hdu_cube = fits.PrimaryHDU(cube, header=hdr)
+        #hdu_cube.writeto(par['fn'].replace('.fits', '.medinput.fits'), overwrite=True)
+
 
 
     else:

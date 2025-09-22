@@ -26,6 +26,11 @@ def parser_init():
         dest='noplot',
         action='store_true',
         help='Creat plot?')
+    parser.add_argument(
+        '--notelluric', 
+        dest='notelluric',
+        action='store_true',
+        help='No telluric absorption. must be set when combining kskywizard updated invsens but no Tel. corrections are necessary')
 
     # args = parser.parse_args()
     # return args
@@ -34,7 +39,7 @@ def parser_init():
 
 _pre = 'kcwi_combinestd.py'
 
-def combinestd(listfile, noplot=False):
+def combinestd(listfile, noplot=False,notelluric=False):
 
     # import plotting libraries
     if not noplot:
@@ -58,6 +63,7 @@ def combinestd(listfile, noplot=False):
     # Invsens from KSkyWizard?
     if 'updated' in listtab['col1'][0]:
         telluric_flag = True
+        print("Warning: the updated invsens will only be correctly used when flux calibrated with KSkyWizard")
     else:
         telluric_flag = False
 
@@ -206,7 +212,8 @@ def combinestd(listfile, noplot=False):
             data0[2, :] = np.nanmean(invsens_2_all, axis=0)
             data0[3, :] = np.nanmean(invsens_3_all, axis=0)
             data0[4, :] = np.nanmean(invsens_4_all, axis=0) * 0 # remove all fitting points
-            data0[5, :] = np.nanmean(invsens_5_all, axis=0)
+            if not notelluric:
+                data0[5, :] = np.nanmean(invsens_5_all, axis=0)
     else:
         data0[0, :] = invsens_0_all.flatten()
         data0[1, :] = invsens_1_all.flatten()
@@ -214,7 +221,8 @@ def combinestd(listfile, noplot=False):
             data0[2, :] = invsens_2_all.flatten()
             data0[3, :] = invsens_3_all.flatten()
             data0[4, :] = invsens_4_all.flatten()
-            data0[5, :] = invsens_5_all.flatten()
+            if not notelluric:
+                data0[5, :] = invsens_5_all.flatten()
 
 
     # write
@@ -234,7 +242,8 @@ def combinestd(listfile, noplot=False):
             p2.line(wave0, data0[1, :], color='black', line_width=2, legend_label='Combined')
         else:
             p2.line(wave0, data0[3], color='black', line_width=2, legend_label='Combined')
-            p1.line(wave0, data0[5], color='black', line_width=2)
+            if not notelluric:
+                p1.line(wave0, data0[5], color='black', line_width=2)
 
 
         # wavegood boundary
