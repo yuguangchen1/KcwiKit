@@ -126,6 +126,8 @@ def bar_fit_helper(argument):
                  if v <= maximum_wavelength][-1]
         ref_wave_of_sub_spectrum = argument['refwave'][minrw:maxrw].copy()
         ref_flux_of_sub_spectrum = argument['reflux'][minrw:maxrw].copy()
+        # set threshold on atlas strength
+        ref_flux_of_sub_spectrum[ref_flux_of_sub_spectrum > argument['linecrop']] = argument['linecrop']
         # get bell cosine taper to avoid nasty edge effects
         tkwgt = signal.windows.tukey(len(ref_flux_of_sub_spectrum),
                                      alpha=argument['tuckeyalpha'])
@@ -138,6 +140,8 @@ def bar_fit_helper(argument):
                                       bounds_error=False,
                                       fill_value='extrapolate')
         intspec = obsint(ref_wave_of_sub_spectrum)
+        # set threshold on arc strength
+        intspec[intspec > argument['linecrop']] = argument['linecrop']
         # apply taper to bar spectrum
         intspec *= tkwgt
         # get a label
@@ -289,6 +293,7 @@ class FitCenter(BasePrimitive):
                 'refwave': self.action.args.refwave,
                 'reflux': self.action.args.reflux,
                 'tuckeyalpha': self.config.instrument.TUKEYALPHA,
+                'linecrop': self.config.instrument.LINECROP,
                 'refdisp': self.action.args.refdisp,
                 'subxvals': subxvals,
                 'nn': number_of_values_to_try, 'x0': self.action.args.x0
