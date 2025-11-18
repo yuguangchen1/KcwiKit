@@ -44,7 +44,7 @@ class ArcOffsets(BasePrimitive):
         tkalpha = self.config.instrument.TUKEYALPHA
         self.logger.info("Using Tukey Alpha value of %.2f" % tkalpha)
         linecrop = self.config.instrument.LINECROP
-        self.looger.info("Using linecrop value of %d" % linecrop)
+        self.logger.info("Using linecrop value of %d" % linecrop)
         arcs = self.context.arcs
         if arcs is not None:
             # Do we plot?
