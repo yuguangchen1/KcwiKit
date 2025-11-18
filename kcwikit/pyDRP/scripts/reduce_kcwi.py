@@ -68,6 +68,10 @@ def _parse_arguments(in_args: list) -> argparse.Namespace:
                         type=float, default=None,
                         help="Fraction of line max for fitting window "
                              "(default: 0.5)")
+    parser.add_argument('-C', '--line_crop', dest='line_crop',
+                        type=int, default=None,
+                        help="Max arc line to crop "
+                             "(default: 65535)")
 
     # in this case, we are loading an entire directory,
     # and ingesting all the files in that directory
@@ -344,6 +348,22 @@ def main():
         elif args.red:
             framework.config.instrument.FRACMAX = float(
                 kcwi_config.RED['fracmax'])
+            
+    # check for linecrop argument
+    if args.line_crop:
+        def_fm = getattr(framework.config.instrument, 'LINECROP', None)
+        if def_fm is not None:
+            framework.context.pipeline_logger.info(
+                "Setting new LINECROP = %d" %
+                args.line_crop)
+            framework.config.instrument.LINECROP = args.line_crop
+    else:
+        if args.blue:
+            framework.config.instrument.LINECROP = float(
+                kcwi_config.BLUE['linecrop'])
+        elif args.red:
+            framework.config.instrument.LINECROP = float(
+                kcwi_config.RED['linecrop'])
 
     # check for atlas line list argument
     if args.atlas_line_list:
