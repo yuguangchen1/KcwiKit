@@ -32,6 +32,10 @@ Sample commands:
 - Individual: `python /path/to/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py kb210705_00030_intf.fits kb210705_00030.reg`
 - Group: `for i in {31..53}; do python /path/to/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py kb210705_000${i}_intf.fits kb210705_000$i.reg; done`
 
+Now tell the DRP where to find those `_smsk.fits` files by making a `kcwi.sky` file. `kcwi.sky` goes in the same directory as the raw data and assuming the `_smsk.fits` files are in the `redux` directory:
+
+`for i in {30..53}; do echo kb210705_000${i}.fits kb210705_000${i}.fits redux/kb210705_000${i}_smsk.fits; done >> kcwi.sky`
+
 ## Median Filtering Regions
 
 ### Continuum Objects (`_icube.thum.reg`)
