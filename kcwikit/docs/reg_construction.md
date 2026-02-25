@@ -36,6 +36,8 @@ Now tell the DRP where to find those `_smsk.fits` files by making a `kcwi.sky` f
 
 `for i in {30..53}; do echo kb210705_000${i}.fits kb210705_000${i}.fits redux/kb210705_000${i}_smsk.fits; done >> kcwi.sky`
 
+will make a `kcwi.sky` file.
+
 ## Median Filtering Regions
 
 ### Continuum Objects (`_icube.thum.reg`)

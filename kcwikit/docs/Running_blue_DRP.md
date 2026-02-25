@@ -12,7 +12,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
 2. (optional) Avoid oversubtraction in sky model. 
 
-    Create sky masks to remove astronomical sources from the sky model. See [here](../docs/reg_construction.md) for details to create `region` masks, covert them to binary FITS files, and make a `kcwi.sky` so the DRP can locate them. 
+    Create sky masks to remove astronomical sources from the sky model. See [here](../docs/reg_construction.md) for details to create `region` masks, covert them to binary FITS files, and make a `kcwi.sky` file so the DRP can locate them. 
 
     Remove all the entries (`OBJECT` and `SKY`) in the `kcwib.proc` table for the science observations. For example, for ```kb240211_00089``` frame, remove the following lines. 
 
