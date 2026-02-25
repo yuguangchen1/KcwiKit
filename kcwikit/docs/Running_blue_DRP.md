@@ -28,7 +28,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 2
     ```
 3. (optional) Check for possible CR rejection false positives
-   It is very common for the current DRP to mistakenly consider bright continuum sources or strong emission lines as cosmic rays, if the count rate surpasses $\simeq$2000. Fortunately, it is easy to identify the fake positives from icube.fits.
+   It is very common for the current DRP to mistakenly consider bright continuum sources or strong emission lines as cosmic rays, if the count rate surpasses $\sim 2000$. Fortunately, it is easy to identify the fake positives from icube.fits.
 
    Open the icube file and inspect the FLAGS extension. If there are values greater than 3 clustering around the QSO, then it is most likely CR false positives.
 
