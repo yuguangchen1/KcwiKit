@@ -25,6 +25,12 @@ Save in **Physical** coordinates (that's all you have at this point!).
   - `^31^32^:G` (for same command, global replace)
   - ...
 
+### Convert regions files to binary FITS files (`_smsk.fits`)
+
+Sample commands:
+
+- Individual: `python /path/to/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py kb210705_00030_intf.fits kb210705_00030.reg`
+- Group: `for i in {31..53}; do python /path/to/KCWI_DRP/kcwidrp/scripts/kcwi_masksky_ds9.py kb210705_000${i}_intf.fits kb210705_000$i.reg; done`
 
 ## Median Filtering Regions
 
