@@ -15,7 +15,7 @@ import pyregion
 from reproject import reproject_interp
 from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
-from PyAstronomy import pyasl
+#from PyAstronomy import pyasl
 from scipy import interpolate
 from scipy import signal
 from scipy import ndimage
@@ -28,7 +28,7 @@ from fpdf import FPDF
 from tqdm import tqdm
 import pdb
 import time as ostime
-from cwitools.synthesis import whitelight
+#from cwitools.synthesis import whitelight
 
 # Read parameter files for alignment, stacking, and astrometry
 def kcwi_stack_readpar(parname='q0100-bx172.par'):
@@ -2521,7 +2521,7 @@ def kcwi_make_2d_mask(fn, mask=None, cubed=False):
     else:
         print('External Mask Incorporation to be developed soon!')
 
-def kcwi_deproject(fn, cubed=False):
+def kcwi_deproject(fn, cubed=False, mask_nan=False):
 
     if cubed:
         suffix="cubed"
@@ -2539,7 +2539,8 @@ def kcwi_deproject(fn, cubed=False):
         print('kb'+trimfn)
         trim = fits.open('kcwi_stack/kb'+trimfn+'_i'+suffix+'.trim.fits')[0]
         img, arr = reproject_interp(msk_3d, trim.header, order = 'bicubic')
-        img[np.isnan(trim.data)]=np.nan
+        if mask_nan:
+            img[np.isnan(trim.data)]=np.nan
         fits.PrimaryHDU(np.round(img), header = ofhdr).writeto('../redux/kb'+trimfn+'_icubes.stackmask.fits', overwrite=True)
         # fig, ax = plt.subplots(1,2)
         # ax[0].imshow(img[5,:,:], origin='lower')

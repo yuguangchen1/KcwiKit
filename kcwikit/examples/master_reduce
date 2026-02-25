@@ -73,10 +73,10 @@ stage1drp () {
   if [ $cfg ]
   then
     echo "Stage 1 (using $cfg)"
-    reduce_kcwi -f kb*.fits -g -st 1 -c $cfg
+    reduce_kcwi -b -f kb*.fits -g -st 1 -c $cfg
   else
     echo "Stage 1"
-    reduce_kcwi -f kb*.fits -g -st 1
+    reduce_kcwi -b -f kb*.fits -g -st 1
   fi
   echo "Stage 1 is Done!"
 }
@@ -85,24 +85,24 @@ stage1plus () {
   # make *_smsk.fits files
   for i in $obj
   do
-  	python ${fileloc}/kcwi_masksky_ds9.py redux/${i}_intf.fits redux/$i.reg;
+  	python ${fileloc}/../scripts/kcwi_masksky_ds9.py redux/${i}_intf.fits redux/$i.reg;
   done
 
   mkdir -p redux/stage5_nomask
   mv redux/*intk.fits redux/*sky.fits redux/stage5_nomask || true
 
-  cp kcwi.proc kcwi_stage1plus.proc
+  cp kcwib.proc kcwi_stage1plus.proc
 
   if [ $machine = "MacOS" ]
   then
-    sed -i '' '/sky/d' kcwi.proc #remove sky
-    sed -i '' '/intk/d' kcwi.proc #remove intk
+    sed -i '' '/sky/d' kcwib.proc #remove sky
+    sed -i '' '/intk/d' kcwib.proc #remove intk
   elif  [ $machine = "Linux" ]
   then
-    sed -i '/sky/d' kcwi.proc #remove sky
-    sed -i '/intk/d' kcwi.proc #remove intk
+    sed -i '/sky/d' kcwib.proc #remove sky
+    sed -i '/intk/d' kcwib.proc #remove intk
   else
-    echo "OS not recognized, can't edit kcwi.proc"
+    echo "OS not recognized, can't edit kcwib.proc"
   fi
 
   #make kcwi.sky file
@@ -116,10 +116,10 @@ stage2drp () {
   if [ $cfg ]
   then
     echo "Stage 2 (using $cfg)"
-    reduce_kcwi -f kb*.fits -g -st 2 -c $cfg
+    reduce_kcwi -b -f kb*.fits -g -st 2 -c $cfg
   else
     echo "Stage 2"
-    reduce_kcwi -f kb*.fits -g -st 2
+    reduce_kcwi -b -f kb*.fits -g -st 2
   fi
   echo "Stage 2 is Done!"
 }
@@ -132,35 +132,35 @@ stage2prereg () {
   all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
   # IFS=$SAVEIFS
 
-  python ${fileloc}/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
-  python ${fileloc}/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
+  python ${fileloc}/../scripts/kcwi_flatten_cube.py redux/${^obj}_icube.fits #make *_icube_2d.fits files
+  python ${fileloc}/../scripts/kcwi_collapse.py redux/${^all}_icube.fits #make *_icube.thum.fits files
 }
 
 # make *.icube_2d.reg and *_icube.thum.reg files
 
 stage2postreg () {
-  python ${fileloc}/kcwi_makemask_medfilter.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
+  python ${fileloc}/../scripts/kcwi_makemask_medfilter.py redux #make *_icube_2d.mask.fits and *_icube.mask.fits files
   #make a backup of *icube.fits files
   mkdir -p redux/pre_med_filt
   cp redux/*icube.fits redux/pre_med_filt
 
   IFS=$'\n'
   all=(`fitsheader redux/kb*_icube.fits --extension 0 -f -k IMTYPE | grep OBJECT | sed 's/_icube.*//' | sed 's$redux/$$'`)
-  python ${fileloc}/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
+  python ${fileloc}/../scripts/kcwi_medfilter.py redux/${^all}_icube.fits #median filter
 
-  cp kcwi.proc kcwi_stage2postreg.proc
+  cp kcwib.proc kcwi_stage2postreg.proc
 
-  # remove SKY and OBJECT from kcwi.proc
+  # remove SKY and OBJECT from kcwib.proc
   if [ $machine = "MacOS" ]
   then
-    sed -i '' '/OBJECT/d' kcwi.proc
-    sed -i '' '/SKY/d' kcwi.proc
+    sed -i '' '/OBJECT/d' kcwib.proc
+    sed -i '' '/SKY/d' kcwib.proc
   elif  [ $machine = "Linux" ]
   then
-    sed -i '/OBJECT/d' kcwi.proc
-    sed -i '/SKY/d' kcwi.proc
+    sed -i '/OBJECT/d' kcwib.proc
+    sed -i '/SKY/d' kcwib.proc
   else
-    echo "OS not recognized, can't edit kcwi.proc"
+    echo "OS not recognized, can't edit kcwib.proc"
   fi
 }
 
@@ -170,11 +170,11 @@ stage3drp () {
   then
     echo "Stage 3 (using $cfg)"
     echo "Note this stage will require some human intervention..."
-    reduce_kcwi -f kb*.fits -g -st 3 -c $cfg
+    reduce_kcwi -b -f kb*.fits -g -st 3 -c $cfg
   else
     echo "Stage 3"
     echo "Note this stage will require some human intervention..."
-    reduce_kcwi -f kb*.fits -g -st 3
+    reduce_kcwi -b -f kb*.fits -g -st 3
   fi
   echo "Stage 3 is Done!"
 }
@@ -192,36 +192,36 @@ stage3plus () {
     exit
   fi
 
-  python ${fileloc}/kcwi_combinestd.py med_bl.list
+  python ${fileloc}/../scripts/kcwi_combinestd.py med_bl.list
   cp -n med_bl_invsens.fits ../redux || true #this should be fixed? -n so no overwrite... need to include BM cfg, etc.
   cd ../ #perhaps there's a better way to do this
-  cp kcwi.proc kcwi_stage3plus.proc
+  cp kcwib.proc kcwi_stage3plus.proc
 
   #clean proc table
   if [ $machine = "MacOS" ]
   then
-    gsed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
-    gsed -i '/icubed/d' kcwi.proc # in case there were no std. stars
-    gsed -i '/icubes/d' kcwi.proc
+    gsed -i '/\bea\b/d' kcwib.proc # whole word 'ea'
+    gsed -i '/icubed/d' kcwib.proc # in case there were no std. stars
+    gsed -i '/icubes/d' kcwib.proc
 
     for i in $std
     do
-    	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwi.proc
+    	sed -i '' "s/${i}.fits/        med_bl.fits/g" kcwib.proc
     done
 
   elif  [ $machine = "Linux" ]
   then
-    sed -i '/\bea\b/d' kcwi.proc # whole word 'ea'
-    sed -i '/icubed/d' kcwi.proc # in case there were no std. stars
-    sed -i '/icubes/d' kcwi.proc
+    sed -i '/\bea\b/d' kcwib.proc # whole word 'ea'
+    sed -i '/icubed/d' kcwib.proc # in case there were no std. stars
+    sed -i '/icubes/d' kcwib.proc
 
     for i in $std
     do
-    	sed -i "s/${i}.fits/        med_bl.fits/g" kcwi.proc
+    	sed -i "s/${i}.fits/        med_bl.fits/g" kcwib.proc
     done
 
   else
-    echo "OS not recognized, can't edit kcwi.proc"
+    echo "OS not recognized, can't edit kcwib.proc"
   fi
 
   mkdir -p redux/pre_std_star_stack
@@ -232,10 +232,10 @@ stage4drp () {
   if [ $cfg ]
   then
     echo "Stage 4 (using $cfg)"
-    reduce_kcwi -f kb*.fits -g -st 3 -c $cfg
+    reduce_kcwi -b -f kb*.fits -g -st 3 -c $cfg
   else
     echo "Stage 4"
-    reduce_kcwi -f kb*.fits -g -st 3
+    reduce_kcwi -b -f kb*.fits -g -st 3
   fi
   echo "Stage 4 is Done!"
   echo "First Part of Reduction Complete"
