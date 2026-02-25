@@ -12,7 +12,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
 2. (optional) Avoid oversubtraction in sky model. 
 
-    Create sky masks to remove astronomical sources from the sky model. See [here](../docs/reg_construction.md) for details to create `region` masks and covert them to binary FITS files. 
+    Create sky masks to remove astronomical sources from the sky model. See [here](../docs/reg_construction.md) for details to create `region` masks, covert them to binary FITS files, and make a `kcwi.sky` so the DRP can locate them. 
 
     Remove all the entries (`OBJECT` and `SKY`) in the `kcwib.proc` table for the science observations. For example, for ```kb240211_00089``` frame, remove the following lines. 
 
@@ -21,7 +21,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     |      89 | 65c6d022d14508b9bd6870ea | 2201009 |      SKY |  2024-02-11-98 |   35.0 | BLUE | Medium |   BL |   28.52 |  4499.90 | 2,2 | KBlue |    60351.382006 |     5 |  sky | kb240211_00089.fits |      sdss08579 | kb240211_00089.fits |
     ```
 
-    Remove the `*_sky.fits` in the `redux/` directory for the frames of which the sky model needs update.
+    Remove the `*_sky.fits` and `*_intk.fits` files in the `redux/` directory for the frames where the sky model needs updating.
 
     Rerun the DRP until after the cube creation
     ```bash
