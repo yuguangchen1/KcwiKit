@@ -81,6 +81,10 @@ def create_log(outfile, filename=[], RED=False, BLUE=False, display=False):
     for i, fn in enumerate(filename):
         hdr = fits.getheader(fn)
 
+        # early commisioning data have no camera keyword
+        if 'CAMERA' not in hdr:
+            continue
+
         if RED:
             if hdr['CAMERA'] != 'RED':
                 continue
