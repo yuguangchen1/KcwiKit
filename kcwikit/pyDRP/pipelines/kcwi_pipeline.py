@@ -206,6 +206,9 @@ class Kcwi_pipeline(BasePipeline):
                                       "flat_make_stack"),
         "flat_make_stack":           ("StackFlats",
                                       "stack_flats_started",        # sflat
+                                      "flat_make_hybrid"),
+        "flat_make_hybrid":          ("MakeHybridFlat",
+                                      "hybrid_flat_started", 
                                       "flat_make_master"),
         "flat_make_master":          ("MakeMasterFlat",
                                       "master_flat_started",        # mflat

@@ -349,8 +349,17 @@ class MakeInvsens(BasePrimitive):
             return self.action.args
         wlm0 = wgoo0
         wlm1 = wgoo1
+
+        # Now interactively identify lines if requested
+        inter_fit_flat = False # interactive fitting? 
+        if self.config.instrument.plot_level >= 2:
+            inter_fit_flat = True
+        if self.action.args['camera']==0:
+            # blue channel
+            if self.config.instrument.plot_level >= 1:
+                inter_fit_flat = True
         # interactively set wavelength limits
-        if self.config.instrument.plot_level > 1:
+        if inter_fit_flat:
             print("CHECKING WAVELENGTH LIMITS")
             print("Current WL limits: %.1f - %.1f Angstroms "
                   "(blue vertical lines)" % (wlm0, wlm1))
@@ -445,8 +454,8 @@ class MakeInvsens(BasePrimitive):
                     lmasks.append(lmdict)
                 else:
                     print("bad line: %s" % lmws)
-        # Now interactively identify lines if requested
-        if self.config.instrument.plot_level >= 2:
+
+        if inter_fit_flat:
             yran = [np.min(obsspec[wl_good]), np.max(obsspec[wl_good])]
             # source = ColumnDataSource(data=dict(x=w, y=obsspec))
             print("MASKING SHARP FEATURES: ABSORPTION LINES/COSMIC RAYS")

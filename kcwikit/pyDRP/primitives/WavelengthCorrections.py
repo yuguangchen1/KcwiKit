@@ -67,6 +67,7 @@ class WavelengthCorrections(BasePrimitive):
             self.logger.info(f"Performing {correction_mode} correction")
             obj = self.heliocentric(obj, correction_mode)
 
+
         if self.config.instrument.air_to_vacuum:
             self.logger.info("Performing Air to Vacuum Conversion")
             obj = self.air2vac(obj)
@@ -89,13 +90,12 @@ class WavelengthCorrections(BasePrimitive):
 
         return self.action.args
 
-    def air2vac(self, obj, mask=False):
+    def air2vac(self, obj):
         """
         Convert wavelengths in a cube from standard air to vacuum.
 
         Args:
             obj (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
-            mask (bool): Set if the cube is a mask cube.
 
         :returns:
             HDU / HDUList: Trimmed FITS object with updated header.
@@ -104,6 +104,9 @@ class WavelengthCorrections(BasePrimitive):
         """
 
         cube = np.nan_to_num(obj.data, nan=0, posinf=0, neginf=0)
+        ecube = np.nan_to_num(obj.uncertainty.array, nan=0, posinf=0, neginf=0)
+        mcube = obj.mask
+        fcube = np.nan_to_num(obj.flags, nan=128, posinf=128, neginf=128)
 
         if obj.header['CTYPE3'] == 'WAVE':
             self.logger.warn("FITS already in vacuum wavelength.")
@@ -119,45 +122,73 @@ class WavelengthCorrections(BasePrimitive):
 
         # resample to uniform grid
         cube_new = np.zeros_like(cube)
+        ecube_new = np.zeros_like(ecube)
+        mcube_new = np.zeros_like(mcube)
+        fcube_new = np.zeros_like(fcube)
         for i in range(cube.shape[2]):
             for j in range(cube.shape[1]):
 
                 spec0 = cube[:, j, i]
-                if not mask:
-                    f_cubic = interp1d(
-                        wave_vac,
-                        spec0,
-                        kind=self.config.instrument.wave_interp_order,
-                        fill_value='extrapolate'
-                        )
-                    spec_new = f_cubic(wave_air)
-                else:
-                    f_pre = interp1d(
-                        wave_vac,
-                        spec0,
-                        kind='previous',
-                        bounds_error=False,
-                        fill_value=128
-                        )
-                    spec_pre = f_pre(wave_air)
+                f_cubic = interp1d(
+                    wave_vac,
+                    spec0,
+                    kind=self.config.instrument.wave_interp_order,
+                    fill_value='extrapolate'
+                    )
+                spec_new = f_cubic(wave_air)
 
-                    f_nex = interp1d(
-                        wave_vac,
-                        spec0,
-                        kind='next',
-                        bounds_error=False,
-                        fill_value=128
-                        )
-                    spec_nex = f_nex(wave_air)
+                espec0 = ecube[:, j, i]
+                f_cubic = interp1d(
+                    wave_vac,
+                    espec0,
+                    kind=self.config.instrument.wave_interp_order,
+                    fill_value='extrapolate'
+                    )
+                espec_new = f_cubic(wave_air)
 
-                    spec_new = np.zeros_like(spec0)
-                    for k in range(spec0.shape[0]):
-                        spec_new[k] = max(spec_pre[k], spec_nex[k])
+                mspec0= mcube[:, j, i]
+                f_cubic = interp1d(
+                    wave_vac,
+                    mspec0,
+                    kind='linear',
+                    fill_value='extrapolate'
+                    )
+                mspec_new = (f_cubic(wave_air) > 0)
+
+
+                fspec0 = fcube[:, j, i]
+                f_pre = interp1d(
+                    wave_vac,
+                    fspec0,
+                    kind='previous',
+                    bounds_error=False,
+                    fill_value=128
+                    )
+                spec_pre = f_pre(wave_air)
+
+                f_nex = interp1d(
+                    wave_vac,
+                    fspec0,
+                    kind='next',
+                    bounds_error=False,
+                    fill_value=128
+                    )
+                spec_nex = f_nex(wave_air)
+
+                fspec_new = np.zeros_like(fspec0)
+                for k in range(spec0.shape[0]):
+                    fspec_new[k] = max(spec_pre[k], spec_nex[k])
 
                 cube_new[:, j, i] = spec_new
+                ecube_new[:, j, i] = espec_new
+                mcube_new[:, j, i] = mspec_new
+                fcube_new[:, j, i] = fspec_new
 
         obj.header['CTYPE3'] = ('WAVE', 'Vacuum Wavelengths')
         obj.data = cube_new
+        obj.uncertainty.array = ecube_new
+        obj.mask = mcube_new
+        obj.flag = fcube_new
         return obj
 
     def a2v_conversion(self, wave):
@@ -196,7 +227,7 @@ class WavelengthCorrections(BasePrimitive):
 
         return new_wave
 
-    def heliocentric(self, obj, correction_mode, mask=False, resample=True,
+    def heliocentric(self, obj, correction_mode, resample=True,
                      vcorr=None):
         """
         Apply heliocentric correction to the cubes.
@@ -209,8 +240,6 @@ class WavelengthCorrections(BasePrimitive):
         Args:
             obj (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
             correction_mode (str): "none", "barycentric", or "heliocentric"
-            mask (bool): Set if the cube is a mask cube. This only works for
-                resampled cubes.
             resample (bool): Resample the cube to the original wavelength grid?
             vcorr (float): Use a different correction velocity.
 
@@ -234,7 +263,12 @@ class WavelengthCorrections(BasePrimitive):
         barycentric = ("barycentric" in correction_mode)
 
         cube = np.nan_to_num(obj.data,
-                             nan=0, posinf=0, neginf=0)
+                nan=0, posinf=0, neginf=0)
+        ecube = np.nan_to_num(obj.uncertainty.array, 
+                nan=0, posinf=0, neginf=0)
+        mcube = obj.mask
+        fcube = np.nan_to_num(obj.flags,
+                nan=128, posinf=128, neginf=128)
 
         v_old = 0.
         if 'VCORR' in obj.header:
@@ -285,30 +319,51 @@ class WavelengthCorrections(BasePrimitive):
         # resample to uniform grid
         self.logger.info("Resampling to uniform grid")
         cube_new = np.zeros_like(cube)
+        ecube_new = np.zeros_like(ecube)
+        mcube_new = np.zeros_like(mcube)
+        fcube_new = np.zeros_like(fcube)
         for i in range(cube.shape[2]):
             for j in range(cube.shape[1]):
 
                 spc0 = cube[:, j, i]
-                if not mask:
-                    f_cubic = interp1d(wav_hel, spc0, kind=self.config.instrument.wave_interp_order,
-                                       fill_value='extrapolate')
-                    spec_new = f_cubic(wav_old)
+                espc0 = ecube[:, j, i]
+                mspc0 = mcube[:, j, i]
+                fspc0 = fcube[:, j, i]
 
-                else:
-                    f_pre = interp1d(wav_hel, spc0, kind='previous',
-                                     bounds_error=False, fill_value=128)
-                    spec_pre = f_pre(wav_old)
-                    f_nex = interp1d(wav_hel, spc0, kind='next',
-                                     bounds_error=False, fill_value=128)
-                    spec_nex = f_nex(wav_old)
-                    spec_new = np.zeros_like(spc0)
-                    for k in range(spc0.shape[0]):
-                        spec_new[k] = max(spec_pre[k], spec_nex[k])
+                f_cubic = interp1d(wav_hel, spc0, kind=self.config.instrument.wave_interp_order,
+                                    fill_value='extrapolate')
+                spec_new = f_cubic(wav_old)
+
+                e_cubic = interp1d(wav_hel, espc0, kind=self.config.instrument.wave_interp_order,
+                                    fill_value='extrapolate')
+                espec_new = e_cubic(wav_old)
+
+                m_linear = interp1d(wav_hel, np.array(mspc0, dtype=float), kind='linear',
+                                    fill_value='extrapolate')
+                mspec_new = (m_linear(wav_old) > 0)
+
+                f_pre = interp1d(wav_hel, fspc0, kind='previous',
+                                    bounds_error=False, fill_value=128)
+                spec_pre = f_pre(wav_old)
+                f_nex = interp1d(wav_hel, fspc0, kind='next',
+                                    bounds_error=False, fill_value=128)
+                spec_nex = f_nex(wav_old)
+                fspec_new = np.zeros_like(fspc0)
+                for k in range(spc0.shape[0]):
+                    fspec_new[k] = max(spec_pre[k], spec_nex[k])
+
                 cube_new[:, j, i] = spec_new
+                ecube_new[:, j, i] = espec_new
+                mcube_new[:, j, i] = mspec_new
+                fcube_new[:, j, i] = fspec_new
 
         obj.header['VCORR'] = (vcorr, 'km/s')
         obj.header['VCORRTYP'] = (correction_mode, 'Vcorr type')
         obj.data = cube_new
+        obj.uncertainty.array = ecube_new
+        obj.mask = mcube_new
+        obj.flags = fcube_new
+
         return obj
 
     def get_wav_axis(self, header):

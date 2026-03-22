@@ -204,6 +204,9 @@ class Kcwi_pipeline(BasePipeline):
                                       "flat_make_master"),
         "flat_make_master":          ("MakeMasterFlat",
                                       "master_flat_started",        # mflat
+                                      "flat_make_hybrid"),
+        "flat_make_hybrid":          ("MakeHybridFlat",
+                                      "hybrid_flat_started",        
                                       "flat_correct_illumination"),
         "flat_correct_illumination": ("CorrectIllumination",
                                       "illumination_correction_started",  # intf

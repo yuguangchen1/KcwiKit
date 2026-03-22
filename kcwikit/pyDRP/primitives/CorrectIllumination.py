@@ -20,10 +20,11 @@ class CorrectIllumination(BasePrimitive):
         BasePrimitive.__init__(self, action, context)
         self.logger = context.pipeline_logger
 
-    def _pre_condition(self):
-        """
-        Checks if we can correct illumination based on the processing table
-        :return:
+    #def _pre_condition(self):
+    #    """
+    #    #Checks if we can correct illumination based on the processing table
+    #    #:return:
+    #    """
         """
         self.action.args.master_flat = None
         self.logger.info("Checking precondition for CorrectIllumination")
@@ -58,6 +59,39 @@ class CorrectIllumination(BasePrimitive):
         if precondition:
             self.action.args.master_flat = get_master_name(tab, target_type)
         return precondition
+    """
+    
+    def _pre_condition(self):
+        """
+        Checks if we can correct illumination based on the processing table.
+        """
+        self.action.args.master_flat = None
+        self.logger.info("Checking precondition for CorrectIllumination")
+
+        tab = []
+        target_type = None
+
+        for target_type in self.config.instrument.flat_order:
+            tab = self.context.proctab.search_proctab(
+                frame=self.action.args.ccddata,
+                target_type=target_type,
+                nearest=True,
+            )
+            if len(tab) > 0:
+                self.logger.info(
+                    "pre condition got %d %s flats, expected 1",
+                    len(tab),
+                    target_type,
+                )
+                self.action.args.master_flat = get_master_name(tab, target_type)
+                return True
+
+        self.logger.info(
+            "pre condition got %d %s flats, expected 1",
+            len(tab),
+            target_type,
+        )
+        return False
 
     def _perform(self):
 
