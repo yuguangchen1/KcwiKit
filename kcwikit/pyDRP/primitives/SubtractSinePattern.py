@@ -558,7 +558,7 @@ class SubtractSinePattern(BasePrimitive):
             return self.action.args
         elif os.path.isfile(out_file) and not self.config.instrument.clobber:
             self.logger.info(f"Reading existing file: {out_file}")
-            self.action.ccddata = kcwi_fits_reader(out_file)[0]
+            self.action.args.ccddata = kcwi_fits_reader(out_file)[0]
 
             return self.action.args
         else:
