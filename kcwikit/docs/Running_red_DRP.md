@@ -59,7 +59,10 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     ```
 
 4. (opitonal) Running the median filtering.
-   **Note: This is not an optional step if you are dealing with bright point-like target due to the diffraction spikes** 
+   **Notes**: 
+    - This is not an optional step if you are dealing with bright point-like target due to the diffraction spikes** 
+    - To run median filtering on the red channel, make sure to run the DRP-version of 
+    the sky subtraction first. 
 
     Create white-light and 2D-flattened images for `icube.fits` files. 
 
