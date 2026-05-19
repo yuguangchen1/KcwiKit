@@ -136,4 +136,9 @@ In the red channel:
 
 ![Flats for the Medium BM 4400 setup](figures/Med-BM-4400_flat.png)
 
+---
+
+### Comparing galaxy spectra from mtwif and mtwdo flats (credit: Kaustubh Gupta)
+
+![Comparing spectra from mtwif and mtwdo](figures/spectra_mtwif_mtwdo.png)
 
