@@ -11,6 +11,7 @@ from astropy import units as u
 from astropy import time
 from astropy import stats
 from astropy import table
+from astropy.wcs.utils import proj_plane_pixel_scales
 import pyregion
 from reproject import reproject_interp
 from reproject import reproject_exact
@@ -2349,12 +2350,82 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
 #    par=kcwi_stack_readpar(parfn)
 
 
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy.wcs.utils import proj_plane_pixel_scales
+from reproject import reproject_interp
+import numpy as np
 
+
+def north_up_image(imgfn, nhdu=0, save_fits=False):
+    """
+    Reproject a FITS image to North-up, East-left.
+
+    Parameters
+    ----------
+    imgfn : str
+        FITS filename.
+    nhdu : int
+        HDU number.
+
+    Returns
+    -------
+    data_new : ndarray
+        Reprojected image.
+    header_new : fits.Header
+        Corresponding FITS header.
+    """
+
+    hdu = fits.open(imgfn)[nhdu]
+
+    data = hdu.data
+    wcs_data = wcs.WCS(hdu.header)
+
+    ny, nx = data.shape[-2:]
+
+    # Typical pixel scale (deg/pixel)
+    pixscale = np.mean(proj_plane_pixel_scales(wcs_data))
+
+    # Sky coordinate at image center
+    ra0, dec0 = wcs_data.pixel_to_world_values(nx/2, ny/2)
+
+    # New north-up WCS
+    wcs_new = wcs.WCS(naxis=2)
+    wcs_new.wcs.crpix = [nx/2, ny/2]
+    wcs_new.wcs.crval = [ra0, dec0]
+    wcs_new.wcs.cdelt = [-pixscale, pixscale]  # East left, North up
+    wcs_new.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+
+    # Reproject
+    data_new, footprint = reproject_interp(
+        (data, wcs_data),
+        wcs_new,
+        shape_out=(ny, nx)
+    )
+
+    # Build header
+    header_new = wcs_new.to_header()
+
+    # Preserve some useful non-WCS keywords
+    for key in [
+        "BUNIT", "BSCALE", "BZERO",
+        "OBJECT", "TELESCOP", "INSTRUME",
+        "FILTER", "DATE-OBS", "EXPTIME",
+        "EQUINOX", "RADESYS"
+    ]:
+        if key in hdu.header:
+            header_new[key] = hdu.header[key]
+
+    if save_fits:
+        hdu_new = fits.PrimaryHDU(data_new, header_new)
+        hdu_new.writeto(imgfn.replace('.fits','_north.fits'), overwrite=True)
+
+    return data_new, header_new
 
 def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-1000,
     conv_filter=-1000,upfactor=-1000,box=[-1.,-1.,-1.,-1.],nocrl=0,method='drizzle',
     save_shift=False,interp_order='bilinear',background_subtraction=False,
-    background_kcwi=0., background_ref=0.,nhdu=0):
+    background_kcwi=0., background_ref=0.,nhdu=0, save_refimg=False):
 
     """
     Conduct astrometry correction of the stacked cube by cross-correlating the
@@ -2514,10 +2585,11 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         img = img - background_kcwi
         img[img < 0] = 0
 
-    hdu_img0=fits.open(imgfn)[nhdu]
-
-    img0=hdu_img0.data.T
-    hdr0=hdu_img0.header
+    #hdu_img0=fits.open(imgfn)[nhdu]
+    #img0=hdu_img0.data.T
+    #hdr0=hdu_img0.header
+    img0, hdr0 = north_up_image(imgfn, nhdu, save_fits=save_refimg)
+    img0 = img0.T
 
     if background_subtraction:
         img0 = img0 - background_ref
