@@ -705,7 +705,7 @@ def kcwi_checkexptime(dir='./',redux=False):
 
 
 
-def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
+def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False, subtract_median=False):
     """
     Check the relative flux difference of overlapping sources in a list of FITS files
         for better flux calibration.
@@ -716,6 +716,8 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
         thumfn (array of str): set if thum files are stored in different directories.
         nsig (float): number of sigmas in sigma-clipping.
         cubed (bool): cubed files?
+        subtract_median (bool): subtract median flux? - only use when background 
+            subtraction is not reliable.
 
     Returns:
         None
@@ -742,6 +744,11 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     sig = np.nanstd(hdu_thum.data, axis=(1,2))
     med = np.nanmedian(hdu_thum.data, axis=(1,2))
 
+    if subtract_median:
+        for i in range(hdu_thum.shape[0]):
+            hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] - np.nanmedian(hdu_thum.data[i,:,:])
+        med = np.zeros(hdu_thum.shape[0])
+        
     frame_all = []
     flux_rel_all = []
     flux_rel = np.zeros(hdu_thum.shape[0])
@@ -775,7 +782,7 @@ def kcwi_check_flux(fnlist, thumfn=None, nsig=1.5, cubed=False):
     return
 
 
-def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
+def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False, subtract_median=False):
     """
     Generate a table of flux correction factor.
 
@@ -785,6 +792,8 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
         thumfn (list): list of thum files if stored in non-default locations.
         nsig (float): number of sigmas for sigma-clip.
         cubed (bool): using cubed files?
+        subtract_median (bool): subtract median flux? - only use when background
+            subtraction is not reliable.
 
     Returns:
         astropy.ascii.table.Table: table containing the normalizing factor to be
@@ -816,6 +825,11 @@ def kcwi_norm_flux(fnlist, frame=[], thumfn=None, nsig=1.5, cubed=False):
 
     sig = np.nanstd(hdu_thum.data, axis=(1,2))
     med = np.nanmedian(hdu_thum.data, axis=(1,2))
+    
+    if subtract_median:
+        for i in range(hdu_thum.shape[0]):
+            hdu_thum.data[i,:,:] = hdu_thum.data[i,:,:] - np.nanmedian(hdu_thum.data[i,:,:])
+        med = np.zeros(hdu_thum.shape[0])
 
     # relative flux
     flux_rel = np.zeros(hdu_thum.shape[0]) + np.nan
