@@ -71,9 +71,11 @@ KCWIKit is recommended to be installed with `python=~3.12`.
 
 3. [Command Line Tools.](./kcwikit/docs/scripts_instruction.md)
 
-4. Tips:
+4. Other issues:
 
     4.1. [Choosing flats.](./kcwikit/docs/choosing_flat.md)
+
+    4.2. [Bias Drifting.](./kcwikit/docs/bias_drift_correction.md)
 
 ## Examples
 [Here](./kcwikit/examples/) are some examples for the stacking code which are referenced in the instructions. 
