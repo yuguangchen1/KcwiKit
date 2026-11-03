@@ -35,7 +35,8 @@ entry_points = {
         "kcwi_medfilter = kcwikit.scripts.kcwi_medfilter:main",
         "kcwi_masksky_ds9_bcrr = kcwikit.scripts.kcwi_masksky_ds9_bcrr:main",
         "kcwi_gen_skyfile = kcwikit.scripts.kcwi_gen_skyfile:main",
-        "kcwi_automask = kcwikit.scripts.kcwi_automask:main"
+        "kcwi_automask = kcwikit.scripts.kcwi_automask:main",
+        "kcwi_xalign = kcwikit.scripts.kcwi_xalign:main"
     ]
 }
 
