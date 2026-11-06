@@ -144,3 +144,67 @@ Additional frames can be appended below.
 
 
 
+
+## kcwi_dichroic_step
+```bash
+kcwi_dichroic_step base [--red RED] [--width WIDTH] [--gapoff GAPOFF] [--suffix SUFFIX] [--plot PLOT]
+```
+Model-free check for an additive (sky-level) mismatch between the blue and red stacks at the dichroic. Per spaxel it fits `F_blue_end = k F_red_start + c`; `c = 0` means no additive mismatch, `c > 0` means blue is high / red low in faint regions.
+- `base` - blue stack base name (reads `<base>_icubes_wcs.fits`, falls back to `<base>_icubes.fits`, plus the `_mcubes` / `_vcubes` if present). Both stacks must be on the same grid.
+- `--red` - red stack base name (default `<base>-red`), e.g. the unchanged red stack after `kcwi_skylevel` corrected only blue.
+- `--width` - window width on each side of the gap [Å observed] (default 150).
+- `--gapoff` - stay this far inside WAVGOOD [Å] (default 20).
+- `--suffix` - flux cube suffix (default `_wcs`).
+- `--plot` - write a PNG of F_blue vs F_red and F_blue/F_red vs brightness.
+
+## kcwi_skylevel
+```bash
+kcwi_skylevel measure BLUE.list RED.list [--fixed red|blue|none] [--same] [--groups auto|FILE] [--template sky|flat|counts] [--image FILE,LO,HI,UNIT[,PIVOT]] [--cubewin NPZ] [--width WIDTH] [--fwhm FWHM] [--json JSON] [--path-map FROM=TO]
+kcwi_skylevel apply   BLUE.list RED.list [--json JSON] [--suffix _skl] [--outdir DIR] [--stack] [--dry-run] [--path-map FROM=TO]
+```
+Measure and correct the residual sky level of each channel, modelled per channel as `beta x T(lambda)`, with `T` the continuum of the sky that was subtracted from each frame. `T` is taken from the frame's own extensions: `SKYMODEL_ZAP` (KSkyWizard), `SKY` / `SKYMODEL`, or `NOSKYSUB - data` (KCWI_DRP). `beta > 0`: too much sky subtracted; `beta < 0`: too little. Run in the stack folder.
+- `measure` - solve for `beta_blue`, `beta_red` from the dichroic continuity of the current stacks, plus optional absolute anchors; prints every constraint with its residual and writes `<blue base>.skylevel.json`.
+- `apply` - for each corrected channel, write `<frame>_skl_icubes.fits` (all extensions kept; header `SKLBETA`, `SKLTEMPL`) and `<base>_skl.list` (or `<base>_skl-red.list`) with copies of its `.par`, `.shift.list`, `.preshift.list`, `.flx.list`, `.astrom.list`; restack it as usual. The fixed channel is not touched: keep its original list and stack. `--stack` corrects the existing stack directly instead (quick check, no restack). Zero (no-data) voxels are left at zero.
+- `--fixed` - channel kept as it is: `red` (default; solve for `beta_blue`), `blue` (solve for `beta_red`), or `none` (solve for both; needs at least one anchor). The dichroic constraint alone fixes only the difference between the channels.
+- `--same` - one beta for both channels (both used the same sky pointing); overrides `--fixed`.
+- `--groups` - one beta per group of frames instead of one per channel, measured from the frames themselves: a blue frame and the red frames taken at the same pointing and PA. `auto` groups by RA, Dec (1") and PA (0.5 deg); `FILE` lists one group per line (frame names, e.g. `kb250503_00098 kr250503_00116 kr250503_00117 kr250503_00118`). For data where the sky changed between exposures (e.g. near twilight). Needs `--fixed red|blue` or `--same`; anchors are not used. `apply` then corrects each frame with its group's beta (frame mode only; `--stack` is refused).
+- `--template` - shape of the error: `sky` (default), `flat` (constant in flux) or `counts` (constant in detector counts).
+- `--image` - reference image anchor `KCWI = a x ref + b` in the KCWI window `LO-HI` [Å observed]; the scale `a` is free, so only the zero level of the reference matters. `UNIT`: `hst` (PHOTFLAM), `nmgy` (needs `PIVOT`), `ps1` (Pan-STARRS stack cutout, needs `PIVOT`: g 4866, r 6215, i 7545), `flam`.
+- `--cubewin` - anchors from another IFU cube, collapsed with `kcwi_cube_windows`.
+- `--path-map` - rewrite frame paths in the lists (e.g. `/Volumes/X=/mnt/X`).
+
+- `--template-step` - sample the sky extension every this many Å when building the template (default 2; it is smoothed over 60 Å anyway; 0 = every plane).
+
+Many sources at once:
+```bash
+kcwi_skylevel batch SOURCES [--steps measure|apply|measure,apply] [--jobs N] [common options]
+```
+`SOURCES` has one source per line (`#` comments): a stack base name (lists `NAME.list` and `NAME-red.list`) or two list files, optionally followed by options for that source only, which override the common ones:
+```
+IRAS03582+6012
+LEDA66688-final       --groups auto
+UGC2369S              --same
+```
+Each source writes its usual `.skylevel.json` and its full output to `<NAME>.skylevel.log`; a summary table (mode, betas, dichroic c, warnings, status) is printed at the end, and a failing source does not stop the others. `--jobs N` runs N sources in parallel processes.
+
+Check the result with `kcwi_dichroic_step <base>_skl --red <base>-red` (`c ~ 0`; drop `--red` if red was corrected too). `apply` prints the exact command.
+
+## kcwi_cube_windows
+```bash
+kcwi_cube_windows cube out.npz --win LO HI [--win LO HI ...] [--ext EXT]
+```
+Collapse a (large) IFU cube, e.g. MUSE, into median images in wavelength windows (strong sky lines left out), per arcsec², with the celestial WCS, written to an `.npz` for `kcwi_skylevel --cubewin`. Reads the cube in chunks; run it where the cube lives rather than over a network mount.
+- `--win` - window `LO HI` [Å observed]; repeat for several windows.
+- `--ext` - data extension (default `DATA` if present, else 0).
+
+## kcwi_xalign
+```bash
+kcwi_xalign shifts BLUE.list RED.list --z Z [--ref image.fits | --astrom T.astrom.list]
+kcwi_xalign wcs    BLUE.list RED.list --z Z [--overwrite] [--check-only]
+kcwi_xalign wcs    NAME --suffix-blue _skl              # = NAME_skl.list and NAME-red.list
+kcwi_xalign batch  SOURCES [--steps shifts,stack,wcs] [--suffix-blue S] [--suffix-red S] [--channels blue|red|both] [--stack-kw K=V,...] [common options]
+```
+Aligns every blue and red frame to one sky frame by cross-correlation (`shifts` writes both `.shift.list` files), and after stacking checks the two stacks against each other and writes `<stack>_icubes_wcs.fits` (`wcs`).
+- A source name instead of two lists uses `NAME<suffix-blue>.list` and `NAME<suffix-red>-red.list`.
+- `batch`: `SOURCES` has one source per line (`#` comments), a name or two list files, followed by options for that source only (e.g. its `--z`, `--ref`). Steps run in the order shifts, stack, wcs; `stack` calls `kcwi_stack` on `--channels` with `--stack-kw` (default `crr_split=True,crr_split_mode=frame,crr_save_mask=True,overwrite=True`). Each source logs to `<NAME>.xalign.log`; a summary (same grid?, red-vs-blue offset, warnings, status) is printed at the end.
+- After `kcwi_skylevel apply` corrected one channel, do not re-run `shifts` (it would rewrite the unchanged channel's shift list; `apply` already copied the shifts). Restack the corrected channel and check: `kcwi_xalign batch SOURCES --steps stack,wcs --suffix-blue _skl --channels blue --overwrite`.

@@ -36,7 +36,10 @@ entry_points = {
         "kcwi_masksky_ds9_bcrr = kcwikit.scripts.kcwi_masksky_ds9_bcrr:main",
         "kcwi_gen_skyfile = kcwikit.scripts.kcwi_gen_skyfile:main",
         "kcwi_automask = kcwikit.scripts.kcwi_automask:main",
-        "kcwi_xalign = kcwikit.scripts.kcwi_xalign:main"
+        "kcwi_xalign = kcwikit.scripts.kcwi_xalign:main",
+        "kcwi_dichroic_step = kcwikit.scripts.kcwi_dichroic_step:main",
+        "kcwi_skylevel = kcwikit.scripts.kcwi_skylevel:main",
+        "kcwi_cube_windows = kcwikit.scripts.kcwi_cube_windows:main"
     ]
 }
 

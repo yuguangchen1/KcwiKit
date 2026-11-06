@@ -40,6 +40,10 @@ it checks the two stacks against each other (and --ref), and writes
     python -c "from kcwikit.kcwi.kcwi import kcwi_stack; kcwi_stack('IRAS03582+6012.list'); kcwi_stack('IRAS03582+6012-red.list')"
     kcwi_xalign wcs IRAS03582+6012.list IRAS03582+6012-red.list --z 0.030 [--ref hst.fits]
 
+A source name instead of the two lists: `kcwi_xalign wcs IRAS03582+6012 --suffix-blue _skl`
+reads IRAS03582+6012_skl.list and IRAS03582+6012-red.list. Many sources:
+`kcwi_xalign batch SOURCES --steps shifts,stack,wcs` (see `kcwi_xalign batch -h`).
+
 Run in the directory holding the .list / .par files (as for kcwi_align).
 """
 import argparse
@@ -697,11 +701,14 @@ def step_wcs(a):
         print('wrote', out)
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('step', choices=['shifts', 'wcs'])
-    ap.add_argument('blue', help='blue .list (as for kcwi_align / kcwi_stack)')
-    ap.add_argument('red', help='red .list')
+    ap.add_argument('blue', help='blue .list (as for kcwi_align / kcwi_stack), or a source name NAME '
+                                 '(lists NAME<suffix-blue>.list and NAME<suffix-red>-red.list)')
+    ap.add_argument('red', nargs='?', help='red .list (omit when blue is a source name)')
+    ap.add_argument('--suffix-blue', default='', help="with a source name: blue list NAME<suffix>.list, e.g. '_skl'")
+    ap.add_argument('--suffix-red', default='', help='with a source name: red list NAME<suffix>-red.list')
     ap.add_argument('--z', type=float, help='redshift: cut emission lines out of the white-light windows')
     ap.add_argument('--wb', type=float, nargs=2, help='blue white-light window [A]; default: 400 A below WAVGOOD1')
     ap.add_argument('--wr', type=float, nargs=2, help='red white-light window [A]; default: 400 A above WAVGOOD0')
@@ -728,7 +735,175 @@ def main():
     ap.add_argument('--overwrite', action='store_true', help='wcs: replace existing *_wcs.fits')
     ap.add_argument('--check-only', action='store_true', help='wcs: only measure, write nothing')
     ap.add_argument('--stack-suffix', default='', help="wcs: measure e.g. the '_wcs' stacks instead")
-    a = ap.parse_args()
+    return ap
+
+
+def source_lists(name, suffix_blue='', suffix_red=''):
+    """NAME -> (NAME<sb>.list, NAME<sr>-red.list)."""
+    b = name[:-len('.list')] if name.endswith('.list') else name
+    return b + (suffix_blue or '') + '.list', b + (suffix_red or '') + '-red.list'
+
+
+def parse(argv):
+    ap = build_parser()
+    a = ap.parse_args(argv)
+    if a.red is None:
+        a.blue, a.red = source_lists(a.blue, a.suffix_blue, a.suffix_red)
+    elif not a.blue.endswith('.list'):
+        ap.error('give two .list files, or one source name (with --suffix-blue / --suffix-red)')
+    for l in (a.blue, a.red):
+        if not os.path.isfile(l):
+            sys.exit('no list %s' % l)
+    return a
+
+
+# ---------------------------------------------------------------------------
+# batch: many sources from a file
+# ---------------------------------------------------------------------------
+BATCH_DOC = """kcwi_xalign batch SOURCES [--steps shifts,stack,wcs] [--suffix-blue S] [--suffix-red S]
+                  [--channels blue|red|both] [--stack-kw KEY=VAL,...] [common kcwi_xalign options]
+
+SOURCES: one source per line ('#' comments). The first word is a source name NAME
+(lists NAME<suffix-blue>.list and NAME<suffix-red>-red.list) or two .list files;
+the rest of the line is options for that source only (e.g. its --z, --ref),
+overriding the common ones. The kcwi_skylevel batch file can be reused: options
+this script does not know are an error, so keep per-source --z etc. in a
+separate file if the two need different ones.
+
+    # source            per-source options
+    IRAS03582+6012      --z 0.030
+    LEDA66688-final     --z 0.0216
+    UGC2369N            --z 0.031 --ref ugc2369_f814w.fits
+
+Steps (in this order, any subset):
+  shifts  cross-correlation shift lists for both channels
+  stack   kcwi_stack each channel in --channels (default both), with --stack-kw
+          (default crr_split=True,crr_split_mode=frame,crr_save_mask=True,overwrite=True)
+  wcs     check blue vs red and write the _icubes_wcs files (add --overwrite)
+
+After kcwi_skylevel apply corrected one channel (e.g. blue -> NAME_skl.list, red
+unchanged), do NOT re-run shifts: apply copied the shift list. Restack the
+corrected channel and check:
+    kcwi_xalign batch sources.txt --steps stack,wcs --suffix-blue _skl --channels blue --overwrite
+
+Each source logs to <NAME><suffix-blue>.xalign.log; a summary is printed at the end
+and a failing source does not stop the others.
+"""
+
+
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, s):
+        for x in self.streams:
+            x.write(s)
+
+    def flush(self):
+        for x in self.streams:
+            x.flush()
+
+
+def _kw(spec):
+    out = {}
+    for item in [x for x in (spec or '').split(',') if x.strip()]:
+        k, v = item.split('=', 1)
+        v = v.strip()
+        for conv in (int, float):
+            try:
+                v = conv(v); break
+            except ValueError:
+                pass
+        if v in ('True', 'False', 'None'):
+            v = {'True': True, 'False': False, 'None': None}[v]
+        out[k.strip()] = v
+    return out
+
+
+def batch(argv):
+    import contextlib, io, re, traceback
+    bp = argparse.ArgumentParser(prog='kcwi_xalign batch', description=BATCH_DOC,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    bp.add_argument('sources')
+    bp.add_argument('--steps', default='shifts', help='any of shifts, stack, wcs (comma-separated; default shifts)')
+    bp.add_argument('--suffix-blue', default='')
+    bp.add_argument('--suffix-red', default='')
+    bp.add_argument('--channels', choices=['blue', 'red', 'both'], default='both', help='stack: which channels')
+    bp.add_argument('--stack-kw', default='crr_split=True,crr_split_mode=frame,crr_save_mask=True,overwrite=True',
+                    help='keyword arguments for kcwi_stack')
+    b, common = bp.parse_known_args(argv)
+    steps = [x.strip() for x in b.steps.split(',') if x.strip()]
+    if not steps or any(x not in ('shifts', 'stack', 'wcs') for x in steps):
+        sys.exit('--steps: any of shifts, stack, wcs')
+    steps = [x for x in ('shifts', 'stack', 'wcs') if x in steps]
+    if 'shifts' in steps and (b.suffix_blue != b.suffix_red):
+        print('NOTE: shifts with different blue/red suffixes rewrites the shift list of the unchanged channel too; '
+              'after kcwi_skylevel apply, use --steps stack,wcs instead')
+    skw = _kw(b.stack_kw)
+    rows = []
+    for line in open(b.sources):
+        t = line.split('#')[0].split()
+        if t:
+            rows.append(t)
+    res = []
+    for row in rows:
+        if len(row) >= 2 and row[0].endswith('.list') and row[1].endswith('.list'):
+            blue, red, extra = row[0], row[1], row[2:]
+        else:
+            blue, red = source_lists(row[0], b.suffix_blue, b.suffix_red)
+            extra = row[1:]
+        name = os.path.basename(blue[:-len('.list')])
+        buf = io.StringIO()
+        r = dict(source=name, status='ok', grid='-', offset='-', warnings=0)
+        with contextlib.redirect_stdout(_Tee(buf, sys.stdout)):
+            try:
+                print('=' * 100 + '\n%s  (%s, %s)  %s' % (name, blue, red, ' '.join(extra)))
+                for l in (blue, red):
+                    if not os.path.isfile(l):
+                        sys.exit('no list %s' % l)
+                for step in steps:
+                    print('-- %s' % step)
+                    if step == 'stack':
+                        from kcwikit.kcwi.kcwi import kcwi_stack
+                        for ch, l in (('blue', blue), ('red', red)):
+                            if b.channels in (ch, 'both'):
+                                kcwi_stack(l, **skw)
+                        continue
+                    a = parse([step, blue, red] + common + extra)
+                    step_shifts(a) if step == 'shifts' else step_wcs(a)
+            except SystemExit as e:
+                r['status'] = 'FAILED: %s' % e
+                print('FAILED:', e)
+            except Exception as e:
+                r['status'] = 'FAILED: %s: %s' % (type(e).__name__, e)
+                traceback.print_exc(file=sys.stdout)
+        log = buf.getvalue()
+        r['warnings'] = sum(1 for l in log.splitlines() if 'WARNING' in l)
+        m = re.findall(r'red vs blue stack: dx=([+-][\d.]+) dy=([+-][\d.]+) px', log)
+        if m:
+            r['offset'] = 'dx %s dy %s px' % m[-1]
+        m = re.findall(r'share one pixel grid \(to ([\d.]+) px\)', log)
+        if m:
+            r['grid'] = 'same (%s px)' % m[-1]
+        elif 'NOT on the same pixel grid' in log:
+            r['grid'] = 'DIFFERENT'
+        try:
+            open(blue[:-len('.list')] + '.xalign.log', 'w').write(log)
+        except OSError:
+            pass
+        res.append(r)
+    print('\n%-30s %-16s %-24s %4s  %s' % ('source', 'grid (wcs)', 'red vs blue stack', 'warn', 'status'))
+    for r in res:
+        print('%-30s %-16s %-24s %4s  %s' % (r['source'], r['grid'], r['offset'], r['warnings'], r['status']))
+    print('logs: <source>.xalign.log')
+    if any(r['status'] != 'ok' for r in res):
+        sys.exit(1)
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'batch':
+        return batch(sys.argv[2:])
+    a = parse(sys.argv[1:])
     step_shifts(a) if a.step == 'shifts' else step_wcs(a)
 
 
