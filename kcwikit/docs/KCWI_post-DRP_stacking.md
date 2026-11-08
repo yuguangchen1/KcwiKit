@@ -201,4 +201,10 @@ In the `jupyter` notebook, or a `Python` script.
 
     A: Use `kcwi_stack(fn, lowmem=True)`. This will significantly increase the amount of time to run the stacking code, but reduces the memory consumption by not loading all the individual frames at once. 
 
+# Newer options (2025-2026)
 
+- `kcwi.kcwi_stack(fn, crr_split=True)` rejects cosmic rays on the common stacking grid by comparing groups of frames (`crr_split_mode='auto'` by default; `'frame'`, `'half'`, `'alternate'`, a number of groups or custom labels). Per-frame masks are saved as `<frame>.crmsk.fits` (`crr_save_mask=True`) and validated against the grid they were made on, so they are reused only when the stack parameters are unchanged. All `crr_*` parameters are documented in the `kcwi_stack` docstring.
+- Several `align_box` lines in the `.par` file are cross-correlated together in `kcwi_align` (`box_combine='norm'|'median'|'sum'`), for fields without a single dominant source.
+- `kcwi_stack(fn, use_astrom=True)` accepts a 3-column `.astrom.list` (`frame dRA dDec`) with one offset per frame, for mosaics.
+- `kcwi_xalign` replaces the point-source alignment for blue+red data without a suitable source, and `kcwi_skylevel` corrects residual sky levels across the dichroic; see [Command Line Tools](./scripts_instruction.md).
+- `from kcwikit.kcwi.kcwi_combine import kcwi_combine_stacks` aligns and co-adds several stacked cubes (different nights or pointings) with exposure or inverse-variance weighting and the same cosmic-ray rejection.
