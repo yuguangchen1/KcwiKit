@@ -35,8 +35,7 @@ import warnings
 import numpy as np
 from astropy.io import ascii
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import kcwi_xalign as X                                 # noqa: E402
+from kcwikit.scripts import kcwi_xalign as X
 
 
 def shift_file(lst, spec):
@@ -59,7 +58,7 @@ def placed(wf, s):
     return w
 
 
-def check_set(g, radius_pix, pix):
+def check_set(g, radius_pix):
     """Per-frame residual (dy, dx) [grid px], its error, R^2, and the channel average."""
     N = len(g)
     r = np.zeros((N, 2)); e = np.zeros((N, 2)); r2 = np.zeros(N)
@@ -145,7 +144,7 @@ def main():
             sf, s, names = ch['shifts'][key]
             g = [X.highpass(X.project(im, placed(w, s[i]), wg, shape), hp)
                  for i, (im, w) in enumerate(zip(ch['imgs'], ch['wcs']))]
-            r, e, r2, T = check_set(g, rad, pix)
+            r, e, r2, T = check_set(g, rad)
             results[(ch['side'], key)] = dict(r=r, e=e, r2=r2, T=T, file=sf)
 
     for ch in chans:
@@ -176,11 +175,15 @@ def main():
                 np.hypot(*en.T).max(), R['r2'].mean()))
     if len(chans) == 2:
         print('\n== blue vs red stacks (average of each channel, as placed by the shifts)')
+        # stack pixel scale from the blue .par file, when it has one
+        stack_pix = X._readpar(a.lists[0].replace('.list', '.par')).get('stack_xpix', -1.)
         for key, _ in sets:
             tr = X.register(results[('red', key)]['T'], results[('blue', key)]['T'], radius=rad)
             en = to_EN(tr['d'], pix)
-            print('   set %s: red sits %+.0f mas E, %+.0f mas N of blue (|d| = %.0f mas = %.2f stack px of 0.146")%s' % (
-                key, en[0], en[1], np.hypot(*en), np.hypot(*en) / 146., '  !' if np.hypot(*en) > a.tol else ''))
+            d = np.hypot(*en)
+            in_px = ' = %.2f stack px of %.3f"' % (d / (stack_pix * 1000.), stack_pix) if stack_pix > 0 else ''
+            print('   set %s: red sits %+.0f mas E, %+.0f mas N of blue (|d| = %.0f mas%s)%s' % (
+                key, en[0], en[1], d, in_px, '  !' if d > a.tol else ''))
     print('\nResiduals are relative to each channel\'s median frame; "!" marks > %.0f mas.' % a.tol)
     print('A residual of a few tens of mas is the noise floor for faint frames; compare the sets, not')
     print('just the numbers: the better list has the smaller residuals. R^2 changes little at high S/N.')

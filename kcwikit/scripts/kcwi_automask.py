@@ -1204,25 +1204,27 @@ def _parse_regions(regstr, shape):
     return mask, nshape
 
 
-def regions_to_mask(regfn, shape, use_regions_pkg=True, verbose=True):
+def regions_to_mask(regfn, shape, use_regions_pkg=True, verbose=True, header=None):
     """Build a boolean mask from a DS9 region file.
 
-    Uses the `regions` package when it is installed, so the result matches
-    kcwi_masksky_ds9.py exactly; otherwise falls back to the parser above.
+    Uses kcwikit.kcwi.kcwi_regions (astropy `regions` or `pyregion`) when one
+    of those packages is installed, so the result matches kcwi_masksky_ds9.py
+    exactly, including sky coordinates (needs `header`), '-' exclusions and
+    shapes outside the image; otherwise falls back to the parser above.
     """
     with open(regfn, 'r') as f:
         regstr = f.read()
     if use_regions_pkg:
         try:
-            from regions import Regions
-            r = Regions.parse(regstr.replace('physical', 'image'), format='ds9')
-            mask = np.zeros(shape, dtype=bool)
-            for region in r.regions:
-                mask |= region.to_mask().to_image(shape).astype(bool)
-            return mask, len(r.regions)
+            from kcwikit.kcwi.kcwi_regions import regions_to_mask as _shared_regions_to_mask
+            mask = _shared_regions_to_mask(regfn, header=header, shape=shape)
+            nshape = sum(1 for l in regstr.splitlines()
+                         if l.strip() and not l.lstrip().startswith('#')
+                         and '(' in l)
+            return mask, nshape
         except ImportError:
             if verbose:
-                print('  (the regions package is not installed; using the built-in parser)')
+                print('  (neither regions nor pyregion is installed; using the built-in parser)')
     return _parse_regions(regstr, shape)
 
 
@@ -1266,7 +1268,7 @@ def convert_region(imfname, regfn=None, thum=None, kind=None, edge_var=1.,
         return None, 0, 0.
     hdul = fits.open(imfname)
     shape = hdul[0].data.shape
-    mask, nshape = regions_to_mask(regfn, shape, verbose=verbose)
+    mask, nshape = regions_to_mask(regfn, shape, verbose=verbose, header=hdul[0].header)
     if kind == 'wl':
         outfile = imfname.replace('_wlimg.fits', '_zap_mask.fits')
         edgemask = ~np.isfinite(hdul[0].data)
@@ -1622,7 +1624,8 @@ def parser_init():
     p.add_argument('-n', '--nsig', type=float, default=None,
                    help='detection threshold [sigma] (default 8 for intf, 4 for thum)')
     p.add_argument('-g', '--grow', type=int, default=None,
-                   help='growth (default 1 for both modes)')
+                   help='growth [pixels] (default 3 for intf, 1 for thum, 2 for wl, '
+                        '1 for --bcrmsk spots, 0 for --bcrmsk strips)')
     p.add_argument('--edge-trim', type=int, default=2,
                    help='intf: columns dropped at each end of a slice')
     p.add_argument('--rect', action='store_true',
@@ -1644,8 +1647,9 @@ def parser_init():
                    help='intf: how many slices away a seed is carried (0 disables; '
                         'default 3, and 0 for --bcrmsk)')
     p.add_argument('--maxfrac', type=float, default=None,
-                   help='most of one slice that may be masked (default 0.5 for intf, '
-                        '0.4 for thum, 1.0 = no limit for wl, where ZAP works per pixel)')
+                   help='most of one slice that may be masked (default 1.0 = no limit for '
+                        'intf and for wl, where ZAP works per pixel; 0.4 for thum; '
+                        '0.25 for --bcrmsk strips)')
     p.add_argument('--bkg-window', type=float, default=11.,
                    help='intf: running-median window for the slice background [columns]')
     p.add_argument('--minpix', type=int, default=2,
@@ -1660,9 +1664,9 @@ def parser_init():
                    help='largest semi-axis of one ellipse; longer sources are tiled '
                         'into several [pixels] (default 6 for thum, 10 for wl)')
     p.add_argument('--shape', choices=['polygon', 'ellipse'], default=None,
-                   help='region shape for thum/wl modes (default: polygon for thum, '
-                        'ellipse for wl). polygon follows the detected pixels, so less '
-                        'is interpolated over; ellipse is easier to adjust in DS9')
+                   help='region shape for thum/wl modes (default: polygon for both). '
+                        'polygon follows the detected pixels, so less is interpolated '
+                        'over; ellipse is easier to adjust in DS9')
     p.add_argument('-p', '--plot', action='store_true',
                    help='write a quick-look PNG per frame')
     p.add_argument('-s', '--smsk', '--mask', dest='mask', action='store_true',
@@ -1673,7 +1677,7 @@ def parser_init():
                         'region file is only read, never rewritten')
     p.add_argument('--regfrom', default=None,
                    help='with --convert: take the regions from this file instead of the '
-                        'default name (one image only)')
+                        "default name; the same file is applied to every image given")
     p.add_argument('--no-clobber', action='store_true',
                    help='skip a frame whose region file already exists, so hand edits '
                         'are never overwritten')

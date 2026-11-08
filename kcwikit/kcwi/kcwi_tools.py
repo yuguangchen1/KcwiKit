@@ -4,7 +4,7 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import cosmology
 import reproject
-import pyregion
+from .kcwi_regions import regions_to_mask
 import os
 import warnings
 import pdb
@@ -694,8 +694,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
             # make 2-D header
             hdr_tmp=collapse_header(hdu0.header)
 
-            reg=pyregion.open(maskfn)
-            reg_mask=reg.get_mask(header=hdr_tmp,shape=hdu0.shape[1:3])
+            reg_mask=regions_to_mask(maskfn, header=hdr_tmp, shape=hdu0.shape[1:3])
 
             for i in range(mask_3d.shape[0]):
                 mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],reg_mask)
@@ -776,8 +775,7 @@ def cart2cyli(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=None,r_
 
             hdr_tmp=collapse_header(hdu0.header)
 
-            reg=pyregion.open(regmask_fn)
-            reg_mask=reg.get_mask(header=hdr_tmp,shape=hdu0.shape[1:3])
+            reg_mask=regions_to_mask(regmask_fn, header=hdr_tmp, shape=hdu0.shape[1:3])
 
             all_mask=np.bitwise_or(all_mask,reg_mask)
 
@@ -1344,8 +1342,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
             # make 2-D header
             hdr_tmp=collapse_header(hdu0.header)
 
-            reg=pyregion.open(maskfn)
-            reg_mask=reg.get_mask(header=hdr_tmp,shape=hdu0.shape[1:3])
+            reg_mask=regions_to_mask(maskfn, header=hdr_tmp, shape=hdu0.shape[1:3])
 
             for i in range(mask_3d.shape[0]):
                 mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],reg_mask)
@@ -1395,8 +1392,7 @@ def cart2cyli_pix(hdu,center,writefn='',maskfn='',ellip=1.,pa=0.,nr=None,npa=Non
 
             hdr_tmp=collapse_header(hdu0.header)
 
-            reg=pyregion.open(regmask_fn)
-            reg_mask=reg.get_mask(header=hdr_tmp,shape=hdu0.shape[1:3])
+            reg_mask=regions_to_mask(regmask_fn, header=hdr_tmp, shape=hdu0.shape[1:3])
 
             all_mask=np.bitwise_or(all_mask,reg_mask)
 

@@ -1,8 +1,8 @@
 # Running the DRP for the red channel
 
-Here summarizes the typical routine with optional improvements to reduce the blue-channel KCWI data using the [updated DRP](../docs/install_DRP.md).
+Here summarizes the typical routine with optional improvements to reduce the red-channel KCWI data using the [updated DRP](../docs/install_DRP.md).
 
-**Before you start**: Running the default DRP does not require to follow this instruction. Simply run ```reduce_kcwi -b -f kb*.fits -g```. 
+**Before you start**: Running the default DRP does not require to follow this instruction. Simply run ```reduce_kcwi -r -f kr*.fits -g```. 
 
 1. Copy the [configuration file `kcwi.cfg`](../pyDRP/configs/kcwi.cfg) to the working directory. Adjust the parameters if needed. For example, we recommend to prioritize dome flat.
 
@@ -30,24 +30,23 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     ```bash
     kcrm_create_crmsk kcrm_<night>.json
     ```
-    This creates `*crmsk.fits` for each frame as cosmic-ray masks. Remove all the science frames in the `kcwir.proc` table. For example, for ```kr240211_00089``` frame, remove the following lines. 
-    **Note: If you are dealing with bright point-like target (e.g. QSOs) it is highly recommended to inspect the generated _crmsk files to avoid false positives from QSO continuum/broad line**
-    If you did get false positives, open the crmsk with ds9, create regions covering the false positives, and name it as, e.g., kr240902_00158_crmsk_recover.reg. The KcwiKit version DRP should identify the region and remove it from CR mask.
+    This creates `*_crmsk.fits` for each frame as cosmic-ray masks (`crmsk = True` in `kcwi.cfg` makes the DRP use them).
+    **Note: If you are dealing with a bright point-like target (e.g. a QSO) it is highly recommended to inspect the generated `_crmsk.fits` files to avoid false positives from the QSO continuum/broad lines.**
 
-    This creates `*crmsk.fits` for each frame as cosmic-ray masks. 
     <details>
-    <summary>(tips) Recover masked pixels </summary>
+    <summary>(tips) Avoiding false positives </summary>
 
-    For bright continuum or emission line objects, the cosmic-ray rejection method may mistakenly identify those as cosmic rays. A quickest fix is to
-    specify the number of sigmas in sigma clipping. 
+    For bright continuum or emission-line objects, the frame comparison may mistakenly identify those as cosmic rays. The quickest fix is to
+    raise the number of sigmas in the sigma clipping (default `3`):
     ```bash
     kcrm_create_crmsk kcrm_<night>.json -s <sigma>
     ```
-    The default is `3`. If this failed, you can recover some pixels manually by setting up a `region` file with a file name of `kr<date>_<frame>_crmask_recover.reg`. 
-    The regions files will be automatically identified and the pixels inside the regions will be recovered.
+    For the astroscrappy pass (always run for frames without a `_crmsk.fits`, and after the custom mask when `extra_crr = True`), protect the source with a
+    protection mask: `kcwi_automask kr<date>_<frame>_intf.fits --bcrmsk` writes `kr<date>_<frame>_bcrmsk.reg` and `kr<date>_<frame>_intf_bcrmsk.fits`
+    (or draw the regions yourself in DS9 and convert them with `kcwi_masksky_ds9_bcrr kr<date>_<frame>_intf.fits kr<date>_<frame>_bcrmsk.reg`), and set `bcrmsk = True` in `kcwi.cfg`.
     </details>
-    
-    Remove all the science frames in the `kcwib.proc` table. For example, for ```kr240211_00089``` frame, remove the following lines. 
+
+    Remove all the science frames in the `kcwir.proc` table. For example, for the ```kr240211_00089``` frame, remove the following lines. 
 
     ```
     |      89 | 65c6d022d14508b9bd6870ea | 2201009 |   OBJECT |  2024-02-11-89 |   15.0 | RED | Medium |   RL |   28.52 |  4499.90 | 2,2 | KBlue |    60351.382006 |     5 |  intf | kb240211_00089.fits |      sdss08579 | kr240211_00089.fits |
@@ -58,7 +57,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st 2
     ```
 
-4. (opitonal) Running the median filtering.
+3. (optional) Running the median filtering.
    **Note: This is not an optional step if you are dealing with bright point-like target due to the diffraction spikes** 
 
     Create white-light and 2D-flattened images for `icube.fits` files. 
@@ -76,7 +75,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     ```
     See [kcwi_medfilter](../docs/scripts_instruction.md) instructions for details to run and configure the parameters. 
 
-5. Once again remove all the science entries in `kcwir.proc`. Run the DRP to the end. 
+4. Once again remove all the science entries in `kcwir.proc`. Run the DRP to the end. 
 
     ```bash
     reduce_kcwi -r -f kr*.fits -g -c kcwi.cfg -st 3
@@ -84,19 +83,19 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
     If you would like to follow the telluric and PCA sky subtraction instructions below, it is not important to conduct the flux calibrations accurately.  
 
-6. (optional) Telluric correction using [KCWI Sky Wizard](https://github.com/zhuyunz/KSkyWizard)
+5. (optional) Telluric correction using [KCWI Sky Wizard](https://github.com/zhuyunz/KSkyWizard)
 
     `KSkyWizard` is a separate tool for telluric correction and sky subtraction for the red channel. For more information, follow the [flux calibration and telluric correction](https://github.com/zhuyunz/KSkyWizard?tab=readme-ov-file#3-flux-calibration-and-telluric-correction) part of the instruction. 
 
-7. (optional) Improving the flux-calibration accuracy by combining multiple standard star frames. 
+6. (optional) Improving the flux-calibration accuracy by combining multiple standard star frames. 
 
     This can be done on either the DRP generated flux calibrations or the telluric corrected flux calibrations. If you skipped the telluric correction, follow the [blue-channel instruction](./Running_blue_DRP.md) from step 6 to the end. 
 
     For the `invsens` files generated by `KSkyWizard`, create a list file similarly that contains the full paths of the `*_invsens_updated.fits` frames. Run `kcwi_combinestd <name>.list`. This will generate a combined `<name>_invsens_update.fits` file, and a figure with individual telluric and sky extinction models. Remove the outliers if you wish, and rerun `kcwi_combinestd`. The new combined `<name>_invsens_update.fits` can be loaded in `KSkyWizard` by clicking on `Open Updated Invsens` button in the `invsens` panel. Load this new combined `invsens` file before proceeding to the next step. 
 
-8. (Optional) Conducting telluric correction and PCA sky subtraction using `KSkyWizard`.
+7. (optional) Conducting telluric correction and PCA sky subtraction using `KSkyWizard`.
     
-    Follow the [sky subtraciton](https://github.com/zhuyunz/KSkyWizard?tab=readme-ov-file#4-sky-subtractionn) section of the `KSkyWizard` instruction. 
+    Follow the [sky subtraction](https://github.com/zhuyunz/KSkyWizard?tab=readme-ov-file#4-sky-subtractionn) section of the `KSkyWizard` instruction. 
 
 Now, you can continue to the [instruction on performing post-DRP stacking](./KCWI_post-DRP_stacking.md) to combine your frames. 
 

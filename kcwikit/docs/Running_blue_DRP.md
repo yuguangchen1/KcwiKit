@@ -32,11 +32,15 @@ Here summarizes the typical routine with optional improvements to reduce the blu
 
    Open the icube file and inspect the FLAGS extension. If there are values greater than 3 clustering around the QSO, then it is most likely CR false positives.
 
-   To fix this problem, open the corresponding intf file, create region masks covering the continuum/strong lines, and use kcwi_masksky_ds9_bcrr to convert them into FITS masks:
+   To fix this problem, make a *protection mask* for the frame: pixels set to 1 in `kb<date>_<frame>_intf_bcrmsk.fits` are handed to astroscrappy as `inmask` and are never cleaned. Either let `kcwi_automask` find the bright source,
    ```bash
-   kcwi_masksky_ds9_bcrr kb250421_00030_intf.fits kb250421_00030.reg
+   kcwi_automask kb250421_00030_intf.fits --bcrmsk
    ```
-   You also have to set bcrmsk=True in the .cfg file
+   which writes `kb250421_00030_bcrmsk.reg` (edit it in DS9 if needed, then `--bcrmsk --convert` re-makes the FITS), or draw the regions yourself on the `_intf.fits` image and convert them:
+   ```bash
+   kcwi_masksky_ds9_bcrr kb250421_00030_intf.fits kb250421_00030_bcrmsk.reg
+   ```
+   Then set `bcrmsk = True` in the `[KCWI]` section of your `kcwi.cfg` (the shipped file has it set to `False`), remove the frame's entries from `kcwib.proc` and rerun from stage 1.
 4. (optional) Running the median filtering.
 
     Create white-light and 2D-flattened images for `icube.fits` files. 

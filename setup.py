@@ -39,7 +39,9 @@ entry_points = {
         "kcwi_xalign = kcwikit.scripts.kcwi_xalign:main",
         "kcwi_dichroic_step = kcwikit.scripts.kcwi_dichroic_step:main",
         "kcwi_skylevel = kcwikit.scripts.kcwi_skylevel:main",
-        "kcwi_cube_windows = kcwikit.scripts.kcwi_cube_windows:main"
+        "kcwi_cube_windows = kcwikit.scripts.kcwi_cube_windows:main",
+        "kcwi_shiftcheck = kcwikit.scripts.kcwi_shiftcheck:main",
+        "kcwi_mask_cube = kcwikit.scripts.kcwi_mask_cube:main"
     ]
 }
 

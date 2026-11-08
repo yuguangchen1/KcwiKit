@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from astropy.io import fits as pf
-from regions import Regions
+from kcwikit.kcwi.kcwi_regions import regions_to_mask
 
 import numpy as np
 import sys
@@ -11,9 +11,9 @@ def main():
     """Creates mask image from ds9 region file.
 
     To use this routine, process your data with default sky subtraction. Then
-    display the target \*_intf.fits file in ds9. Use region shapes to indicate
+    display the target *_intf.fits file in ds9. Use region shapes to indicate
     non-sky pixels in image (box, circle, etc.). Write out ds9 region file
-    (\*.reg). Ensure the region file is in physical coordinates Then run this routine:
+    (*.reg). Ensure the region file is in physical coordinates Then run this routine:
 
         * ``python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111_intf.fits ds9.reg``
 
@@ -23,7 +23,7 @@ def main():
     re-run the pipeline.
 
     Args:
-        imagename (string): The name of a \*_intf.fits image
+        imagename (string): The name of a *_intf.fits image
         regionname (string): The name of a ds9 region file
 
     Returns:
@@ -69,23 +69,11 @@ def main():
     header = hdu_list[0].header
     shape = hdu_list[0].shape
 
-    # load the region file
-    with open(regfname, 'r') as f:
-        # Read it out as a string
-        regstr = f.read()
-        
-        # Check if the region file is in physical coordinates
-        if 'physical' in regstr:
-            print("[Warning] 'physical' coordinates not supported by regions. Replacing with 'image'")
-            regstr = regstr.replace('physical', 'image')
-
-        r = Regions.parse(regstr, format='ds9')
-        mask = None
-        for region in r.regions:
-            if mask is None:
-                mask = region.to_mask().to_image(shape).astype(bool)
-            else:
-                mask = mask | region.to_mask().to_image(shape).astype(bool)
+    # rasterise the region file (handles image/physical/sky coordinates,
+    # '-' exclusions and shapes outside the image)
+    mask = regions_to_mask(regfname, header=header, shape=shape)
+    if not mask.any():
+        print("[Warning] no region covers the image; writing an empty mask")
 
     # write out the mask
     hdu = pf.PrimaryHDU(np.uint8(mask))

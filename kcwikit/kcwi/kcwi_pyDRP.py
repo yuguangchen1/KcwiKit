@@ -11,7 +11,10 @@ from astropy import units
 from astropy import time
 from astropy import stats
 from astropy import table
-import pyregion
+try:
+    import pyregion  # legacy module: optional
+except ImportError:
+    pyregion = None
 from reproject import reproject_interp
 from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
@@ -23,7 +26,6 @@ from scipy import ndimage
 #from image_registration.fft_tools import shift
 import matplotlib
 import matplotlib.pyplot as plt
-import pyregion
 from fpdf import FPDF
 from tqdm import tqdm
 import pdb

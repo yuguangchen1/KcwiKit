@@ -34,9 +34,23 @@ def parser_init():
     
     parser.add_argument(
         '-s', '--sigma',
-        help='Sigma value for sigma clipping.',
+        help='Sigma value for sigma clipping (default 3).',
         type=float,
         default = 3
+    )
+
+    parser.add_argument(
+        '--ratio',
+        help='Minimum |frame - median| / median for a pixel to count as a cosmic ray (default 0.6).',
+        type=float,
+        default = 0.6
+    )
+
+    parser.add_argument(
+        '--proc',
+        help='Processing table used to find the wavelength map (default kcwir.proc under base_dir).',
+        type=str,
+        default = 'kcwir.proc'
     )
     
     parser.add_argument(
@@ -119,7 +133,7 @@ def search_proctab(proctab, frame, target_type=None, target_group=None,
     return tab
 
 
-def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
+def create_crmsk(filename, label=[], sigma=3, ratio=0.6, proc='kcwir.proc', base_dir='./', redux_dir='redux'):
     
     if isinstance(filename, list):
         filename = filename[0]
@@ -133,6 +147,9 @@ def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
     redux = os.path.join(base_dir, redux_dir)
 
     obj_dict = json.load(open(filename, 'r'))
+
+    # the processing table is the same for every frame: read it once
+    proctab = read_proctab(os.path.join(base_dir, proc))
 
     if not os.path.isdir(os.path.join(redux, 'int_median')):
         os.mkdir(os.path.join(redux, 'int_median'))
@@ -157,7 +174,6 @@ def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
             img = img_hdu[0].data
 
             # get wavemap
-            proctab = read_proctab(os.path.join(base_dir, 'kcwir.proc'))
             tab = search_proctab(proctab,
                     frame=img_hdu[0], target_type='MARC',
                     nearest=True)
@@ -166,24 +182,25 @@ def create_crmsk(filename, label=[], sigma=3, base_dir='./', redux_dir='redux'):
             wavemap_file = os.path.join(redux, ofn)
             wavemap = fits.open(wavemap_file)[0].data
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=RuntimeWarning)
-                ratio = np.nanmedian(img[wavemap > 0] / msci[wavemap > 0])
-            #    _,ratio,__=sigma_clipped_stats(img[wavemap > 0] / msci[wavemap > 0], sigma = 3, maxiters=1,grow=2)
-
-            crs = img - msci#*ratio
-            #print("rescaling msci by a factor of %f"%ratio)
-            crs_ratio=np.abs((img - msci)/msci)
-            crmsk = (sigma_clip(crs, sigma = 3, maxiters=1, grow=2).mask & (crs_ratio>0.6)).astype(float)
-            crmsk_surr = sigma_clip(crs, sigma = 3, maxiters=1, grow=10).mask.astype(float)
+            crs = img - msci
+            # relative excess; where the median frame is ~0 (gaps, unilluminated
+            # pixels) the ratio is undefined, so treat it as "not a cosmic ray"
+            with np.errstate(divide='ignore', invalid='ignore'):
+                crs_ratio = np.abs(crs / msci)
+            crs_ratio[~np.isfinite(crs_ratio)] = 0.
+            crmsk = (sigma_clip(crs, sigma = sigma, maxiters=1, grow=2).mask & (crs_ratio > ratio)).astype(float)
+            crmsk_surr = sigma_clip(crs, sigma = sigma, maxiters=1, grow=10).mask.astype(float)
 
 
-            idx = np.where((crmsk < 1e-4) & (crmsk_surr > 1e-4) & (wavemap > 0) )
+            # flux scale of this frame relative to the median, measured just
+            # around the cosmic rays (used to scale the replacement values)
+            idx = np.where((crmsk < 1e-4) & (crmsk_surr > 1e-4) & (wavemap > 0) & (msci != 0))
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 ratio2 = np.nanmedian(img[idx]/msci[idx])
-            
-            print(ratio, ratio2)
+            if not np.isfinite(ratio2):
+                ratio2 = 1.
+            print('  %d CR pixel(s); local frame/median flux ratio = %.3f' % (int(np.sum(crmsk > 0)), ratio2))
 
             crmsk_med = crmsk * msci * ratio2
             crmsk_med[crmsk_med < 1e-4] = 0

@@ -248,7 +248,7 @@ def _crr_zsmooth(a, size, step=1):
 
 def _flag_outliers(I, V, good, nsig=5., rel=0.5, window=5, zwindow=3, zmed=15,
                    grow_xy=2, grow_z=2, grow_nsig=2., pad_xy=0, loo=None,
-                   zratio=51, zstep=8, fsys=0.05, fgrad=0.5, grow_rel=0.25,
+                   zratio=51, zstep=8, fsys=0.05, fgrad=0.5, grow_rel=0.1,
                    smax=5.):
     """
     Flag positive outliers (cosmic rays) in each of N aligned cubes by comparing
@@ -455,7 +455,7 @@ def kcwi_combine_stacks(cubefns, outname, wavebin=None, box=None, search_size=10
                         crr_rel=0.5, crr_window=5, crr_zwindow=3, crr_zmed=15,
                         crr_grow_xy=2, crr_grow_z=2, crr_grow_nsig=2., crr_pad_xy=0,
                         crr_zratio=51, crr_zstep=8, crr_fsys=0.05, crr_fgrad=0.5,
-                        crr_grow_rel=0.25,
+                        crr_grow_rel=0.1,
                         zblock=200, display=True, overwrite=True):
     """
     Align and co-add stacked KCWI cubes (outputs of kcwi_stack).
@@ -820,8 +820,9 @@ def kcwi_combine_stacks(cubefns, outname, wavebin=None, box=None, search_size=10
 
     vhdr = hdr_out.copy()
     b = hdr_out.get('BUNIT', '')
-    if b.startswith('10^(-8)erg'):
-        vhdr['BUNIT'] = '10^(-16)erg2/s2/cm6/arcsec4'
+    if b.startswith('1e-16 erg') or b.startswith('10^(-8)erg'):
+        # '10^(-8)erg/s/cm3/arcsec2' is the pre-Nov-2026 kcwi_stack string
+        vhdr['BUNIT'] = '1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
     elif b.startswith('count'):
         vhdr['BUNIT'] = 'count2/s2/arcsec4'
     mhdr = hdr_out.copy()

@@ -11,7 +11,7 @@ from astropy import units as u
 from astropy import time
 from astropy import stats
 from astropy import table
-import pyregion
+from .kcwi_regions import regions_to_mask
 from reproject import reproject_interp
 from reproject import reproject_exact
 #from MontagePy.main import mProjectCube
@@ -23,7 +23,6 @@ from scipy import ndimage
 #from image_registration.fft_tools import shift
 import matplotlib
 import matplotlib.pyplot as plt
-import pyregion
 from fpdf import FPDF #fpdf2
 from tqdm import tqdm
 import pdb
@@ -474,18 +473,20 @@ def empty_hdul_like(hdul):
     This is to solve the problem that hdl.copy() is a shallow copy and still links the data arrays.
     """
     new_hdus = []
-    for hdu in hdul:
-        # If HDU has data
-        if hdu.data is not None:
-            empty_data = np.zeros_like(hdu.data)
-            new_hdu = fits.ImageHDU(data=empty_data, header=hdu.header.copy()) \
-                if isinstance(hdu, fits.ImageHDU) else \
-                fits.PrimaryHDU(data=empty_data, header=hdu.header.copy())
+    for i, hdu in enumerate(hdul):
+        if isinstance(hdu, (fits.BinTableHDU, fits.TableHDU)) and \
+                not isinstance(hdu, fits.CompImageHDU):
+            # Tables are copied as they are (deep copy of the record array).
+            new_hdu = hdu.__class__(data=hdu.data.copy() if hdu.data is not None else None,
+                                    header=hdu.header.copy(), name=hdu.name)
+        elif hdu.data is None:
+            # Header-only HDU: keep the header, no data.
+            cls = fits.PrimaryHDU if i == 0 else fits.ImageHDU
+            new_hdu = cls(data=None, header=hdu.header.copy())
         else:
-            # e.g., BinTableHDU or HDUs without data
-            new_hdu = hdu.copy()  # copy header, structure
-            new_hdu.data = None
-            new_hdu.header = None
+            empty_data = np.zeros_like(hdu.data)
+            cls = fits.PrimaryHDU if i == 0 else fits.ImageHDU
+            new_hdu = cls(data=empty_data, header=hdu.header.copy())
         new_hdus.append(new_hdu)
     return fits.HDUList(new_hdus)
 
@@ -590,27 +591,32 @@ def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='barycentric'):
         cube_old = np.nan_to_num(hdu_in.data,posinf=0.,neginf=0.)
 
         shape_new = (hdr_new['NAXIS3'], hdr_new['NAXIS2'], hdr_new['NAXIS1'])
-        # Treat as science?
+        # How to resample this extension:
+        #   'science'  - cubic interpolation of the values
+        #   'uncert'   - linear interpolation of the variance (sigma**2), then sqrt;
+        #                cubic can overshoot and nearest-neighbour misaligns sigma
+        #                and flux by up to half a channel
+        #   'mask'     - nearest-neighbour ('nearest-up') so integer flags stay integers
         if inputflag=='hdu':
-            mask_flag = mask
-            fill_value = 128
+            kind = 'mask' if mask else 'science'
+            fill_value = 128 if mask else np.nan
         else:
             if 'EXTNAME' not in hdu_in.header:
-                mask_flag = False
+                kind = 'science'
                 fill_value = np.nan
                 print("Stacking primary HDU.")
             else:
                 if hdu_in.header['EXTNAME']=='MASK':
                     print(hdu_in.header['EXTNAME'])
-                    mask_flag = True
+                    kind = 'mask'
                     fill_value = 1
                 elif hdu_in.header['EXTNAME']=='FLAGS':
                     print(hdu_in.header['EXTNAME'])
-                    mask_flag = True
+                    kind = 'mask'
                     fill_value = 128
                 elif hdu_in.header['EXTNAME']=='UNCERT':
                     print(hdu_in.header['EXTNAME'])
-                    mask_flag = True
+                    kind = 'uncert'
                     fill_value = np.nan
                 else:
                     print("Warning: EXTNAME not recognized, skipping HDU.")
@@ -627,30 +633,15 @@ def kcwi_vachelio(hdl, hdr_ref=None, mask=False, method='barycentric'):
         for i in range(shape_new[2]):
             for j in range(shape_new[1]):
                 spec = cube_old[:, j, i]
-                if mask_flag==False:
+                if kind == 'science':
                     f_cubic=interpolate.interp1d(wave_hel,spec,kind='cubic',fill_value=fill_value,bounds_error=False)
                     spec_new=f_cubic(wave_new)
-                    #if i==18 and j==47:
-                    #    print("Using cubic interpolation for science data.")
-                    #    plt.plot(wave_hel,hdu_in.data[:, j, i],drawstyle='steps-mid')
-                    #    plt.show()
-                    # testing
-                    #if (spec_new.shape[0]-np.sum(np.isfinite(spec_new)))>0:
-                        #pdb.set_trace()
+                elif kind == 'uncert':
+                    f_var=interpolate.interp1d(wave_hel,spec**2,kind='linear',fill_value=fill_value,bounds_error=False)
+                    spec_new=np.sqrt(np.clip(f_var(wave_new), 0, None))
                 else:
-                    #f_pre=interpolate.interp1d(wave_hel,spec,kind='previous',bounds_error=False,fill_value=fill_value)
-                    #spec_pre=f_pre(wave_new)
-                    #f_nex=interpolate.interp1d(wave_hel,spec,kind='next',bounds_error=False,fill_value=fill_value)
-                    #spec_nex=f_nex(wave_new)
-                    
                     f_nearest=interpolate.interp1d(wave_hel,spec,kind='nearest-up',bounds_error=False,fill_value=fill_value)
-                    spec_new=f_nearest(wave_new)#np.zeros(shape_new[0])
-                    #for k in range(shape_new[0]):
-                    #    spec_new[k]=np.rint(max(spec_pre[k],spec_nex[k]))
-                        #try:
-                        #except:
-                        #    print(spec_pre[k],spec_nex[k])
-                        #    return 1
+                    spec_new=f_nearest(wave_new)
                 cube_new[:, j, i] = spec_new
 
         hdl_out[i_ext].data = cube_new
@@ -1006,7 +997,7 @@ def _crr_zsmooth(a, size, step=1):
 
 def _crr_flag_outliers(I, V, good, nsig=5., rel=0.5, window=5, zwindow=3, zmed=15,
                        grow_xy=2, grow_z=2, grow_nsig=2., pad_xy=0, loo=None,
-                       zratio=51, zstep=8, fsys=0.05, fgrad=0.5, grow_rel=0.25,
+                       zratio=51, zstep=8, fsys=0.05, fgrad=0.5, grow_rel=0.1,
                        smax=5.):
     """
     Flag positive outliers (cosmic rays) in each of N cubes on a common grid by
@@ -1397,6 +1388,27 @@ def _crr_write_mask(fnmask, rej, gridid, dimension, hdr0, frames, params, place=
     fits.HDUList([fits.PrimaryHDU(), hdu]).writeto(fnmask, overwrite=True)
 
 
+def _iss6_scale(hdu, dtype=np.int32):
+    """
+    Work-around for KcwiKit Issue #6 / Montage Issue #80: the MontagePy
+    build of mProjectCube reads |values| < 1 as 0, so the trimmed cubes handed
+    to it are scaled to a large integer range (only used when montagepy=True). The factor is stored as ISS6FIX and
+    divided out again by _iss6_factor() when the drizzled cubes are read.
+    (Restored from Yuguang's 37b6dd9, lost in 95de13b.)
+    """
+    oflow_limit = np.iinfo(dtype).max
+    peak = np.nanmax(np.abs(hdu.data))
+    fac = np.float64(oflow_limit) / peak / 100. if np.isfinite(peak) and peak > 0 else 1.0
+    hdu.data = np.nan_to_num(hdu.data * fac).astype(dtype)
+    hdu.header['ISS6FIX'] = (fac, 'scale applied before mProjectCube; divide to undo')
+    return hdu
+
+
+def _iss6_factor(trimfile):
+    """ISS6FIX factor of a trimmed cube, 1.0 if it was not scaled."""
+    return float(fits.getheader(trimfile).get('ISS6FIX', 1.0))
+
+
 def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscale_y=0.,
                dimension=[0,0],orientation=-1000.,cubed=False,drizzle=0,weights=[],
                wave_ref=[0, 0], dwave=0, nwave=0, wave_interp_method='cubic',
@@ -1473,15 +1485,15 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             the final stack. Can be combined with crr (which runs first).
         crr_split_mode (str, int or array): how the frames are compared.
             An integer N splits the frames into N groups of consecutive frames
-            (34 into 5 gives 7,7,7,7,6); 'auto' picks N so that each group
-            holds about crr_pergroup frames. The run time is linear in the
+            (34 into 5 gives 7,7,7,7,6); 'auto' (default) picks N so that each
+            group holds about crr_pergroup frames. The run time is linear in the
             number of groups, so 'frame' on a 34-frame stack costs about seven
             times what five groups do; the frame responsible for each flagged
             voxel is still identified individually inside its group by
             _crr_frame_reject, so grouping costs accuracy only where two
             cosmic rays from different frames of the same group land on the
             same voxel.
-            'frame' (default): every frame is compared with the median of all
+            'frame': every frame is compared with the median of all
                 the other frames. The most sensitive option; needs >= 3 frames
                 to be robust (>= 4-5 is comfortable).
             'half': first half of the list against the second half, each
@@ -1556,7 +1568,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         crr_fgrad (float): the same for the spatial gradient, i.e. the error a
             sub-pixel registration offset produces; this one does bind.
         crr_grow_rel (float): relative threshold while growing, so a cosmic ray
-            beside a bright source cannot grow into it.
+            beside a bright source cannot grow into it. Default 0.1 (the same
+            default is used by _crr_flag_outliers and kcwi_combine_stacks).
         crr_frame_nsig (float): threshold for picking the responsible frame(s)
             at a flagged voxel. Only used when a group holds several frames.
         crr_zblock (int): number of wavelength channels processed at a time
@@ -1683,14 +1696,29 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         prera=pre_tab['col2']
         predec=pre_tab['col3']
 
+    # Absolute astrometry offsets, one per frame (restored from Yuguang's
+    # df92496/7d43e0d, lost in 95de13b). The .astrom.list file is either
+    #   2 columns: dRA dDec            -> one offset for every frame, or
+    #   3 columns: frame dRA dDec      -> per-frame offsets (mosaics).
+    astrom_rashift = np.zeros(len(fn))
+    astrom_decshift = np.zeros(len(fn))
     if use_astrom:
-        astrom_tab=ascii.read(fnlist.replace('.list','.astrom.list'))
-        astrom_rashift=astrom_tab['col1'][0]
-        astrom_decshift=astrom_tab['col2'][0]
+        astromfn = fnlist.replace('.list','.astrom.list')
+        astrom_tab=ascii.read(astromfn)
+        if len(astrom_tab.colnames)==2:
+            astrom_rashift[:] = astrom_tab['col1'][0]
+            astrom_decshift[:] = astrom_tab['col2'][0]
+        else:
+            astrom_basenames = np.array([os.path.basename(str(row['col1'])) for row in astrom_tab])
+            for i in range(len(fn)):
+                base = os.path.basename(fn[i])
+                index = (astrom_basenames == base) | (astrom_basenames + '_i' + suffix + '.fits' == base)
+                if np.sum(index) != 1:
+                    raise ValueError('%s: expected exactly one entry for %s, found %d'
+                                     % (astromfn, base, int(np.sum(index))))
+                astrom_rashift[i] = astrom_tab['col2'][index][0]
+                astrom_decshift[i] = astrom_tab['col3'][index][0]
         overwrite=True
-    else:
-        astrom_rashift=0.
-        astrom_decshift=0.
 
     # flux weight
     if fluxfn=='':
@@ -1703,8 +1731,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
 
     # construct wcs
-    airmass_list = [] #construct list of airmass
-    expt_list = []
     hdulist=fits.open(fn[0])
     hdrtmp=hdulist[0].header.copy()
     hdulist.close()
@@ -1737,7 +1763,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     hdr0['CD2_1']=0
     #hdr0['CTYPE3']='WAVE'
     #hdr0['BUNIT']='10^(-16)erg/s/cm2/Angstrom'
-    hdr0['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
+    hdr0['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
     if suffix!='cubes':
         #hdr0['BUNIT']='adu/s'
         hdr0['BUNIT']='count/s/arcsec2'
@@ -1778,6 +1804,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
     montmfns=[]
     montefns=[]
     etime=np.zeros(len(fn))
+    airmass_list = []
+    expt_list = []
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
 
@@ -1787,8 +1815,6 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             hdulist=fits.open(fn[i])
             hdr=hdulist[0].header.copy()
             print("     CRVAL (original) = "+str(hdr['CRVAL3']))
-            airmass_list.append(hdr['AIRMASS'])
-            expt_list.append(hdr['XPOSURE'])
             # IDL or Python?
 
             if len(hdulist) == 1:
@@ -1856,9 +1882,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                 del hdr2d['CUNIT3']
                 hdr2d['NAXIS']=2
 
-                region = pyregion.open(regfn).as_imagecoord(hdr2d)
-                tmp = np.mean(hdu_i.data,axis=0)
-                mask_reg = region.get_mask(hdu=fits.PrimaryHDU(tmp,header=hdr2d))
+                mask_reg = regions_to_mask(regfn, header=hdr2d, shape=hdu_i.data.shape[1:])
 
                 hdu_i.data[:,mask_reg] = np.nan
                 hdu_v.data[:,mask_reg] = np.nan
@@ -1899,8 +1923,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             else:
                 hdu_i.data=hdu_i.data/area
                 hdu_v.data=hdu_v.data/area**2
-                hdu_i.header['BUNIT']='10^(-8)erg/s/cm3/arcsec2'
-                hdu_v.header['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+                hdu_i.header['BUNIT']='1e-16 erg/s/cm2/Angstrom/arcsec2'
+                hdu_v.header['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
 
 
             # preshift
@@ -1923,17 +1947,17 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
             # astrometry correction
             if use_astrom:
-                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift/3600.
-                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift/3600.
+                hdu_i.header['CRVAL1']=hdu_i.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_i.header['CRVAL2']=hdu_i.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift/3600.
-                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift/3600.
+                hdu_v.header['CRVAL1']=hdu_v.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_v.header['CRVAL2']=hdu_v.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift/3600.
-                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift/3600.
+                hdu_m.header['CRVAL1']=hdu_m.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_m.header['CRVAL2']=hdu_m.header['CRVAL2']+astrom_decshift[i]/3600.
 
-                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift/3600.
-                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift/3600.
+                hdu_e.header['CRVAL1']=hdu_e.header['CRVAL1']+astrom_rashift[i]/3600.
+                hdu_e.header['CRVAL2']=hdu_e.header['CRVAL2']+astrom_decshift[i]/3600.
 
             # shift
             hdu_i.header['CRPIX1']=hdu_i.header['CRPIX1']+xshift[i]
@@ -2020,12 +2044,28 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     hdu_m = kcwi_resample_wave(hdu_m, hdr0, method='mask')
                     hdu_e = kcwi_resample_wave(hdu_e, hdr0, method='linear')
 
+                # Issue #6 hot fix, MontagePy only: the MontagePy wheel reads
+                # |values| < 1 as 0 (Montage issue #80), so integer-scale the
+                # cubes handed to it. The command-line mProjectCube does not
+                # need it, and the int32 quantisation would cost precision on
+                # faint pixels next to a bright source, so it is skipped there.
+                if montagepy:
+                    hdu_i = _iss6_scale(hdu_i)
+                    hdu_v = _iss6_scale(hdu_v)
+                    hdu_m = _iss6_scale(hdu_m)
+                    hdu_e = _iss6_scale(hdu_e)
 
             # write
             hdu_i.writeto(trimfn[i],overwrite=True)
             hdu_v.writeto(trimvfn[i],overwrite=True)
             hdu_m.writeto(trimmfn[i],overwrite=True)
             hdu_e.writeto(trimefn[i],overwrite=True)
+
+        # airmass / exposure-time bookkeeping, read from the trimmed cube so it
+        # is also filled when trimmed cubes from a previous run are reused
+        hdr_trim = fits.getheader(trimfn[i])
+        airmass_list.append(hdr_trim['AIRMASS'])
+        expt_list.append(hdr_trim['XPOSURE'])
 
         # Montage
         if method.lower()=='drizzle':
@@ -2052,7 +2092,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdut=(fits.open(trimfn[i]))[0]
                 hdut.data[np.isfinite(hdut.data)==False]=0.
-                newi,newa=reproject_interp(hdut,newhdr,order=method,independent_celestial_slices=True)
+                newi,newa=reproject_interp(hdut,newhdr,order=method)
                 hdui=fits.PrimaryHDU(newi,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdui.writeto(montfn,overwrite=True)
@@ -2060,7 +2100,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdutv=(fits.open(trimvfn[i]))[0]
                 hdutv.data[np.isfinite(hdutv.data)==False]=0.
-                newv,newa=reproject_interp(hdutv,newhdr,order=method,independent_celestial_slices=True)
+                newv,newa=reproject_interp(hdutv,newhdr,order=method)
                 hduv=fits.PrimaryHDU(newv,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hduv.writeto(montvfn,overwrite=True)
@@ -2068,7 +2108,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdutm=(fits.open(trimmfn[i]))[0]
                 hdutm.data[np.isfinite(hdutm.data)==False]=0.
-                newm,newa=reproject_interp(hdutm,newhdr,order='bilinear',independent_celestial_slices=True)
+                newm,newa=reproject_interp(hdutm,newhdr,order='bilinear')
                 hdum=fits.PrimaryHDU(newm,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdum.writeto(montmfn,overwrite=True)
@@ -2076,7 +2116,7 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
 
                 hdute=(fits.open(trimefn[i]))[0]
                 hdute.data[np.isfinite(hdute.data)==False]=0.
-                newe,newa=reproject_interp(hdute,newhdr,order='bilinear',independent_celestial_slices=True)
+                newe,newa=reproject_interp(hdute,newhdr,order='bilinear')
                 hdue=fits.PrimaryHDU(newe,newhdr)
                 hdua=fits.PrimaryHDU(newa,newhdr)
                 hdue.writeto(montefn,overwrite=True)
@@ -2109,13 +2149,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
         mdata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.int16).T+128
         edata0=np.zeros((dimension[0],dimension[1],hdr0['NAXIS3'],len(fn)),dtype=np.float64).T
         for i in range(len(fn)):
-            newcube=fits.open(montfns[i])[0].data
+            newcube=fits.open(montfns[i])[0].data / _iss6_factor(trimfn[i])
             newcube[~np.isfinite(newcube)]=0.
-            newcubev=fits.open(montvfns[i])[0].data
+            newcubev=fits.open(montvfns[i])[0].data / _iss6_factor(trimvfn[i])
             newcubev[~np.isfinite(newcubev)]=0.
-            newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+            newcubem=np.ceil(fits.open(montmfns[i])[0].data / _iss6_factor(trimmfn[i]))
             newcubem[~np.isfinite(newcubem)]=128
-            newcubee=fits.open(montefns[i])[0].data
+            newcubee=fits.open(montefns[i])[0].data / _iss6_factor(trimefn[i])
             newcubee[~np.isfinite(newcubee)]=0.
             data0[i,:,:,:]=newcube
             vdata0[i,:,:,:]=newcubev
@@ -2221,8 +2261,8 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     pr, pd = float(prera[ix[0]]), float(predec[ix[0]])
             return {'CRMXSH': float(xshift[i]), 'CRMYSH': float(yshift[i]),
                     'CRMPRA': pr, 'CRMPDEC': pd,
-                    'CRMASRA': float(astrom_rashift),
-                    'CRMASDE': float(astrom_decshift),
+                    'CRMASRA': float(np.mean(astrom_rashift)),
+                    'CRMASDE': float(np.mean(astrom_decshift)),
                     'CRMSRC': os.path.basename(fn[i])[:60]}
         crr_mskfn = [_crr_mask_fn(f, crr_mask_dir, 'crmsk') for f in fn]
 
@@ -2326,11 +2366,11 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
                     c_i, c_v = data0[i, p0:p1], vdata0[i, p0:p1] #reading the montage drizzled cubes already in memory
                     c_m, c_e = mdata0[i, p0:p1], edata0[i, p0:p1]
                 else:
-                    c_i = np.nan_to_num(fits.open(montfns[i], memmap=True)[0].data[p0:p1])
-                    c_v = np.nan_to_num(fits.open(montvfns[i], memmap=True)[0].data[p0:p1])
-                    c_m = np.ceil(fits.open(montmfns[i], memmap=True)[0].data[p0:p1])
+                    c_i = np.nan_to_num(fits.open(montfns[i], memmap=True)[0].data[p0:p1] / _iss6_factor(trimfn[i]))
+                    c_v = np.nan_to_num(fits.open(montvfns[i], memmap=True)[0].data[p0:p1] / _iss6_factor(trimvfn[i]))
+                    c_m = np.ceil(fits.open(montmfns[i], memmap=True)[0].data[p0:p1] / _iss6_factor(trimmfn[i]))
                     c_m[~np.isfinite(c_m)] = 128
-                    c_e = np.nan_to_num(fits.open(montefns[i], memmap=True)[0].data[p0:p1])
+                    c_e = np.nan_to_num(fits.open(montefns[i], memmap=True)[0].data[p0:p1] / _iss6_factor(trimefn[i]))
                 ok = (c_m == 0) & np.isfinite(c_i) & np.isfinite(c_v) & (c_v != 0) & (c_e > 0)
                 if crr_pre is not None:
                     ok &= ~crr_pre[i, p0:p1]
@@ -2448,13 +2488,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             mask = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             exp = np.zeros((len(fn), hdr0['NAXIS3'], dimension[1]))
             for i in range(len(fn)):
-                newcube=fits.open(montfns[i])[0].data
+                newcube=fits.open(montfns[i])[0].data / _iss6_factor(trimfn[i])
                 newcube[~np.isfinite(newcube)]=0.
-                newcubev=fits.open(montvfns[i])[0].data
+                newcubev=fits.open(montvfns[i])[0].data / _iss6_factor(trimvfn[i])
                 newcubev[~np.isfinite(newcubev)]=0.
-                newcubem=np.ceil(fits.open(montmfns[i])[0].data)
+                newcubem=np.ceil(fits.open(montmfns[i])[0].data / _iss6_factor(trimmfn[i]))
                 newcubem[~np.isfinite(newcubem)]=128
-                newcubee=fits.open(montefns[i])[0].data
+                newcubee=fits.open(montefns[i])[0].data / _iss6_factor(trimefn[i])
                 newcubee[~np.isfinite(newcubee)]=0.
                 img[i,:,:]=newcube[:, :, ii]
                 var[i,:,:]=newcubev[:, :, ii]
@@ -2543,12 +2583,13 @@ def kcwi_stack(fnlist,shiftlist='',preshiftfn='',fluxfn='',pixscale_x=0.,pixscal
             os.remove(trimmfn[i])
             os.remove(trimefn[i])
 
+    # exposure-time weighted airmass
     hdr0['AIRMASS']=np.sum(np.array(airmass_list)*np.array(expt_list)/np.sum(expt_list))
     # write
     vhdr0=hdr0.copy()
     if suffix=='cubes':
         #vhdr0['BUNIT']='10^(-32)erg2/s2/cm4/Angstrom2'
-        vhdr0['BUNIT']='10^(-16)erg2/s2/cm6/arcsec4'
+        vhdr0['BUNIT']='1e-32 erg2/s2/cm4/Angstrom2/arcsec4'
     else:
         #vhdr0['BUNIT']='adu2/s2'
         vhdr0['BUNIT']='count2/s2/arcsec4'
@@ -3047,12 +3088,9 @@ def kcwi_align(fnlist,wavebin=[-1.,-1.],box=[-1,-1,-1,-1],pixscale_x=-1.,pixscal
         print("Checking for region file: {}".format(regfn))
         if os.path.isfile(regfn) and use_regmask==True and ".reg" in regfn:
             print('Using region mask: {}'.format(regfn))
-            region = pyregion.open(regfn).as_imagecoord(hdr)
-            tmp = np.mean(img,axis=2)
-            #print(img.shape, tmp.shape)
-            mask_reg = region.get_mask(hdu=fits.PrimaryHDU(tmp.T,header=hdr))
-            #plt.imshow(mask_reg, origin='lower', cmap='gray')
-            img[mask_reg.T!=0]=np.nan
+            # img is (x, y, wave) here, the mask is (ny, nx)
+            mask_reg = regions_to_mask(regfn, header=hdr, shape=(img.shape[1], img.shape[0]))
+            img[mask_reg.T]=np.nan
 
         thum=np.zeros((sz[0],sz[1]))
         for ii in range(sz[0]):
@@ -3497,7 +3535,19 @@ def kcwi_astrometry(fnlist,imgfn='',wavebin=[-1.,-1.],display=True,search_size=-
         img = img - background_kcwi
         img[img < 0] = 0
 
-    hdu_img0=fits.open(imgfn)[nhdu]
+    # Reference image: use the requested extension, otherwise the first one
+    # that actually holds a 2-D image (handles MEF and compressed files).
+    hdl_img0 = fits.open(imgfn)
+    if nhdu is not None and nhdu < len(hdl_img0) and hdl_img0[nhdu].data is not None \
+            and hdl_img0[nhdu].data.ndim == 2:
+        hdu_img0 = hdl_img0[nhdu]
+    else:
+        cands = [h for h in hdl_img0 if h.data is not None and h.data.ndim == 2]
+        if len(cands) == 0:
+            raise ValueError('%s: no 2-D image extension found' % imgfn)
+        if nhdu is not None and nhdu != 0:
+            print('  [WARNING] extension %d has no 2-D image, using the first one that does' % nhdu)
+        hdu_img0 = cands[0]
 
     img0=hdu_img0.data.T
     hdr0=hdu_img0.header

@@ -58,7 +58,7 @@ import numpy as np
 from astropy.io import ascii, fits
 from astropy.table import Table
 from astropy import wcs as awcs
-from scipy import ndimage, optimize
+from scipy import ndimage
 
 try:
     from reproject import reproject_interp
@@ -177,14 +177,14 @@ def frame_image(fn, band, z, side, trim=(0, 0), npix_trim=1, preshift=(0., 0.), 
     if use_regmask:
         reg = fn.replace('.fits', '_rm.reg')
         if os.path.isfile(reg):
-            try:
-                import pyregion
-                hh = w2.to_header()
-                hh['NAXIS'], hh['NAXIS1'], hh['NAXIS2'] = 2, img.shape[1], img.shape[0]
-                m = pyregion.open(reg).as_imagecoord(hh).get_mask(shape=img.shape)
-                img[m] = np.nan
-            except Exception as e:
-                print('  [WARNING] region mask %s not applied: %s' % (reg, e))
+            # a region file that exists but cannot be applied is an error, not
+            # a warning: silently skipping it changes the alignment result
+            from kcwikit.kcwi.kcwi_regions import regions_to_mask
+            hh = w2.to_header()
+            hh['NAXIS'], hh['NAXIS1'], hh['NAXIS2'] = 2, img.shape[1], img.shape[0]
+            m = regions_to_mask(reg, header=hh, shape=img.shape)
+            img[m] = np.nan
+            print('  region mask %s: %d pixel(s) masked' % (os.path.basename(reg), int(m.sum())))
     w2.wcs.crval = w2.wcs.crval + np.array(preshift) / 3600.
     return img, w2, band
 

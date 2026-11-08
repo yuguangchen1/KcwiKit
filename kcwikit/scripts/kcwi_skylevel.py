@@ -79,7 +79,10 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from scipy.ndimage import gaussian_filter, map_coordinates, median_filter
 
-warnings.simplefilter('ignore')
+# silence only the numpy nan-reduction chatter; astropy WCS/FITS warnings stay
+# visible because they point at real header problems
+warnings.filterwarnings('ignore', category=RuntimeWarning,
+                        message=r'.*(All-NaN|empty slice|invalid value|divide by zero).*')
 SKYLINES = [5577.34, 5889.95, 5895.92, 6300.30, 6363.78, 7316.3, 7340.9, 7750.6, 7794.1, 7821.5,
             7913.7, 7993.3, 8344.6, 8399.2, 8430.2, 8465.4, 8827.1, 8885.8, 8919.6]
 
@@ -443,6 +446,9 @@ def frame_window(f, lo, hi):
     for l in SKYLINES:
         k &= np.abs(w - l) > 8
     i = np.where(k)[0]
+    if i.size == 0:
+        sys.exit('%s: no channels in the %.0f-%.0f A window (cube covers %.0f-%.0f A)'
+                 % (os.path.basename(f['file']), lo, hi, w[0], w[-1]))
     d = np.array(h[0].data[i[0]:i[-1] + 1], float)[k[i[0]:i[-1] + 1]]
     for e in ('FLAGS', 'MASK'):
         if e in h:
@@ -571,21 +577,29 @@ def measure(a):
         return measure_groups(a, chans, wb, wr)
     fb, _ = window_image(B['cube'], B['mcube'], *wb)
     fr, _ = window_image(R['cube'], R['mcube'], *wr)
-    if fb.shape != fr.shape:
-        sys.exit('blue and red stacks are on different grids')
+    if fb is None or fr is None:
+        sys.exit('no channels left in the dichroic windows %.0f-%.0f / %.0f-%.0f A; check WAVGOOD0/1 '
+                 'in the stack headers or use --width' % (wb + wr))
+    wcs_b, wcs_r = WCS(B['header']).celestial, WCS(R['header']).celestial
+    if not same_grid(wcs_b, wcs_r, fb.shape, fr.shape):
+        sys.exit('blue and red stacks are on different grids (shape or WCS differ); '
+                 'run kcwi_xalign wcs / restack with identical .par grids first')
     k, c, ek, ec, n = robust_line(fr.ravel(), fb.ravel())
     tb, tr = Tw(B, *wb), Tw(R, *wr)
     rows.append(('dichroic %.0f-%.0f / %.0f-%.0f A (k=%.3f, %d spaxels)' % (wb + wr + (k, n)), -tb, k * tr, c, max(ec, a.floor)))
 
-    # image anchors
-    kw = WCS(B['header']).celestial
+    # image anchors (each channel's own WCS; the grids were checked equal above)
+    kwcs = {'blue': wcs_b, 'red': wcs_r}
     for spec in a.image or []:
         ref = load_image(spec)
         side = 'blue' if ref['hi'] <= B['wg'][1] + 1 else 'red'
         ch = chans[side]
         lo, hi = max(ref['lo'], ch['wg'][0]), min(ref['hi'], ch['wg'][1])
         kimg, _ = window_image(ch['cube'], ch['mcube'], lo, hi)
-        rimg, reg = reference_on_grid(ref['img'], ref['wcs'], kw, kimg.shape, a.fwhm, ref['pix'], kimg=kimg)
+        if kimg is None:
+            print('WARNING %s: no %s channels in %.0f-%.0f A, anchor skipped' % (ref['name'], side, lo, hi))
+            continue
+        rimg, reg = reference_on_grid(ref['img'], ref['wcs'], kwcs[side], kimg.shape, a.fwhm, ref['pix'], kimg=kimg)
         s, b, es, eb, n = robust_line(rimg.ravel(), kimg.ravel())
         t = Tw(ch, lo, hi)
         rows.append(('%s %s %.0f-%.0f A (slope %.3f, shift %+.2f" %+.2f"%s, %d px)' % (
@@ -605,7 +619,10 @@ def measure(a):
                 continue
             ch = chans[side]
             kimg, _ = window_image(ch['cube'], ch['mcube'], lo, hi)
-            rimg, reg = reference_on_grid(z[key] * scl, rw, kw, kimg.shape, a.fwhm, pix, kimg=kimg)
+            if kimg is None:
+                print('WARNING %s: no %s channels in %.0f-%.0f A, anchor skipped' % (os.path.basename(npz), side, lo, hi))
+                continue
+            rimg, reg = reference_on_grid(z[key] * scl, rw, kwcs[side], kimg.shape, a.fwhm, pix, kimg=kimg)
             s, b, es, eb, n = robust_line(rimg.ravel(), kimg.ravel())
             t = Tw(ch, lo, hi)
             rows.append(('%s %s %.0f-%.0f A (slope %.3f, shift %+.2f" %+.2f"%s, %d px)' % (

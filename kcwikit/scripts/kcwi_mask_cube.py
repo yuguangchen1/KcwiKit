@@ -1,124 +1,89 @@
-import glob, os, sys, re
+#!/usr/bin/env python
+"""
+Flag the pixels inside hand-drawn DS9 regions (<frame>_rm.reg) in the FLAGS
+extension of a data cube, so that they are excluded from the final stack.
+
+The region file is drawn on a white-light image of the cube; the same
+2-D region is applied to every wavelength channel by setting bit 32 of
+FLAGS. The cube itself is left unchanged and a copy is written:
+
+    <frame>_zap_icubes.fits -> <frame>_zap_new_icubes.fits   (--red)
+    <frame>_icubes.fits     -> <frame>_new_icubes.fits       (--blue)
+"""
+
+import os
 import argparse
-import json
 import numpy as np
-import pyregion
-import argparse
 from astropy.io import fits
-import pathlib
-fileloc = str(pathlib.Path(__file__).parent.resolve())
+
+from kcwikit.kcwi.kcwi_regions import regions_to_mask, header_to_2d
+
+FLAG_REGION = 32   # FLAGS bit set for pixels inside the region file
 
 
 def parser_init():
-    description = 'Conduct median filtering and subtract the median-filtered background.'
-
-    parser = argparse.ArgumentParser(description=description)
+    parser = argparse.ArgumentParser(
+        description='Set FLAGS bit %d inside the regions of <frame>_rm.reg for '
+                    'every wavelength channel of the matching cube.' % FLAG_REGION)
     parser.add_argument('files', type=str, nargs='+',
-            help='Region file name; must end with _rm.reg')
-    parser.add_argument('-r','--red', dest='red',
-            action='store_true',
-            help='Red channel ZAPPED cube.')
-    parser.add_argument('-b','--blue', dest='blue',
-            action='store_true',
-            help='Blue channel flux calibrated cube.')
-    args = parser.parse_args()
-    return args
+                        help='Region file name(s); must end with _rm.reg')
+    chan = parser.add_mutually_exclusive_group(required=True)
+    chan.add_argument('-r', '--red', dest='red', action='store_true',
+                      help='Red channel: apply to <frame>_zap_icubes.fits')
+    chan.add_argument('-b', '--blue', dest='blue', action='store_true',
+                      help='Blue channel: apply to <frame>_icubes.fits')
+    return parser
 
-def collapse_header(hdr):
-    """
-    Quick wrapper to collapse a 3-D header into a 2-D one.
-    Copied from KCWIKit
 
-    Parameters
-    ----------
-    hdr: header
+def makemask(files, blue=False, red=False):
+    """Apply each <frame>_rm.reg to the FLAGS extension of its cube.
 
-    Returns
-    -------
-    hdr_img: collapsed header
-
-    """
-
-    hdr_img=hdr.copy()
-    hdr_img['NAXIS']=2
-    del hdr_img['NAXIS3']
-    del hdr_img['CD3_3']
-    del hdr_img['CTYPE3']
-    del hdr_img['CUNIT3']
-    del hdr_img['CNAME3']
-    del hdr_img['CRVAL3']
-    del hdr_img['CRPIX3']
-
-    return hdr_img
-
-def makemask(files,blue=False, red=False):
-    """Converting region files to binary masks specifically for removal in the final stack.
     Args:
-        dir (str): directory of which the region files are stored.
-    Returns:
-        None. Region files are converted to binary FITS files. 
+        files (list of str): region file names ending with _rm.reg.
+        blue, red (bool): which channel's cube naming convention to use.
     """
+    if red:
+        in_suffix, out_suffix = '_zap_icubes.fits', '_zap_new_icubes.fits'
+    else:
+        in_suffix, out_suffix = '_icubes.fits', '_new_icubes.fits'
 
-    #search_for = dir + "/*_rm.reg"
+    for regfn in files:
+        if not regfn.endswith('_rm.reg'):
+            print('Skipping %s: region file name must end with _rm.reg' % regfn)
+            continue
+        if not os.path.isfile(regfn):
+            print('Skipping %s: file not found' % regfn)
+            continue
+        cubefn = regfn.replace('_rm.reg', in_suffix)
+        if not os.path.isfile(cubefn):
+            print('Skipping %s: cube %s not found' % (regfn, cubefn))
+            continue
 
-    #for regfn in glob.glob(search_for):
-    #        imgfn=regfn.replace('_rm.reg','.fits')
-    #        os.system(fileloc+"/kcwi_masksky_ds9_thum.py "+imgfn+" "+regfn)
-    for file in files:
-        if os.path.isfile(file):
-            regfn=file
-            if red:
-                cubefn=regfn.replace('_rm.reg','_zap_icubes.fits')
-                #imgfn=regfn.replace('_rm.reg','_wlimg.fits')
-                hdl=fits.open(cubefn)
-                scihdr=hdl[0].header
-                obswave= (np.arange(scihdr['NAXIS3']) + 1 - scihdr['CRPIX3']) * scihdr['CD3_3'] + scihdr['CRVAL3']
-                wlimg_index = np.where((obswave >= 5650.) & (obswave <= 8930.))[0]
-                wlimg = np.sum(hdl[0].data[wlimg_index], axis = 0)
-                mhdu=fits.PrimaryHDU(wlimg, header = collapse_header(scihdr))
-                #mhdu=fits.open(imgfn)[0]
-            elif blue:
-                cubefn=regfn.replace('_rm.reg','_icubes.fits')
-                hdl=fits.open(cubefn)
-                scihdr=hdl[0].header
-                obswave= (np.arange(scihdr['NAXIS3']) + 1 - scihdr['CRPIX3']) * scihdr['CD3_3'] + scihdr['CRVAL3']
-                wlimg_index = np.where((obswave >= 3550.) & (obswave <= 5500))[0]
-                wlimg = np.sum(hdl[0].data[wlimg_index], axis = 0)
-                mhdu=fits.PrimaryHDU(wlimg, header = collapse_header(scihdr))
-                #imgfn=regfn.replace('_rm.reg','_thum.fits')
-            
-            
-            
-            
-            
-            r = pyregion.open(regfn)
-            region_mask  = r.get_mask(hdu=mhdu)
-            mask2d=np.zeros_like(mhdu.data)
-            mask2d[region_mask] = 1
-            
-            expanded_mask2d = np.repeat(mask2d[np.newaxis, :, :], hdl[0].data.shape[0], axis=0)
-            #maskhdu = fits.PrimaryHDU(expanded_mask2d, header = hdl[0].header)
-            flagcube=hdl['FLAGS'].data.copy()
-            flagcube[expanded_mask2d > 0] += 32
-            hdl['FLAGS'].data = flagcube
-            print("Updating cubes with mask from", regfn)
-            if red:
-                fdest=cubefn.replace('_zap_icubes.fits','_zap_new_icubes.fits')
-            elif blue:
-                fdest=cubefn.replace('_icubes.fits','_new_icubes.fits')
-            hdl.writeto(fdest, overwrite = True)
-            print(fdest, "created")
-            # Create the mask FITS file 
-            #filename = regfn.replace('_rm.reg','_rm_mask.fits')
-            #maskhdu.writeto(filename, overwrite = True)
+        with fits.open(cubefn) as hdl:
+            scihdr = hdl[0].header
+            # only the spatial WCS matters for the region; no white-light image
+            # (and no grating-specific wavelength window) is needed
+            hdr2d = header_to_2d(scihdr)
+            shape2d = hdl[0].data.shape[1:]
+            mask2d = regions_to_mask(regfn, header=hdr2d, shape=shape2d)
+
+            flags = hdl['FLAGS'].data
+            # OR the bit in, so running twice (or on a _new cube) is idempotent
+            flags[:, mask2d] |= np.array(FLAG_REGION, dtype=flags.dtype)
+            hdl['FLAGS'].header['HISTORY'] = 'kcwi_mask_cube: bit %d set from %s' % (
+                FLAG_REGION, os.path.basename(regfn))
+
+            fdest = cubefn.replace(in_suffix, out_suffix)
+            hdl.writeto(fdest, overwrite=True)
+        print('%s: %d spaxel(s) flagged from %s -> %s' % (
+            os.path.basename(cubefn), int(mask2d.sum()), os.path.basename(regfn),
+            os.path.basename(fdest)))
+
 
 def main():
-    args = parser_init()
-    #args = arg_parser.parse_args()
-
-    # Generate a master parameter table
+    args = parser_init().parse_args()
     makemask(**vars(args))
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     main()

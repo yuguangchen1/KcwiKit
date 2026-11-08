@@ -1,93 +1,80 @@
 #!/usr/bin/env python
 
 """
-Generate log files based on FITS headers. 
+Generate the KCWI DRP sky-frame table (kcwi.sky) from the frame-grouping JSON
+written by kcrm_group_frames.
+
+Each science frame gets a row "frame skyframe skymask":
+  * a group <obj> with a companion group <obj>_sky uses the first frame of
+    <obj>_sky as an external sky frame and no sky mask (per the KCWI DRP
+    instructions);
+  * otherwise the frame is its own sky frame and the group's first-frame
+    _smsk.fits mask is used.
 """
 
 import argparse
-import glob, os, sys, re
-from astropy.io import fits
-from astropy.table import Table
+import re
 import json
+from astropy.table import Table
+
+
 def parser_init():
     """Create command-line argument parser for this script."""
-    parser = argparse.ArgumentParser(description="Create log files based on FITS headers")
+    parser = argparse.ArgumentParser(
+        description="Create the DRP sky-frame table (kcwi.sky) from the frame-grouping JSON")
     parser.add_argument(
         'outfile',
         type=str,
-        help='Filename of the output CSV table',
-        nargs=1
-        )
-    parser.add_argument(
-        '-f', '--filename',
-        type=str,
-        help='log file',
-        nargs='*',
-        required=False
+        help='Name of the output table (usually kcwi.sky)'
         )
     parser.add_argument(
         '-l', '--referencelog',
         type=str,
-        help='json file documenting the frame grouping',
-        nargs='*',
-        required=False
+        help='JSON file documenting the frame grouping (from kcrm_group_frames)',
+        required=True
         )
     parser.add_argument(
         '-d', '--display',
-        help='Print table',
+        help='Print the table',
         action='store_true'
         )
     return parser
 
-def create_log(outfile, filename=[], display=False,referencelog=[]):
-    
-    if not isinstance(filename, list):
-        filename = [filename]
 
-    if isinstance(outfile, list):
-        outfile = outfile[0]
+def create_skyfile(outfile, referencelog, display=False):
+    """Build the sky table and write it as a space-separated file."""
+    with open(referencelog, 'r') as f:
+        obj_dict = json.load(f)
 
-    if isinstance(referencelog, list):
-        referencelog = referencelog[0]
-    
-    nos = []
-    skyframe = []
-    skymask = []
-    obj_dict = json.load(open(referencelog, 'r'))
-    # select only groups with "sky" in the name
-    selected_keys = [k for k in obj_dict.keys() if "sky" in k]
-    for obj in list(obj_dict.keys()):
-        if obj+"_sky" in selected_keys:
-            sky_group=obj_dict[obj+"_sky"]
-        else:
-            sky_group=None
-        for fn in obj_dict[obj]:
-            nos.append(fn)
-            if sky_group is not None:
-                skyframe.append(sky_group[0])
-                skymask.append('') #do not use skymask when using external sky frame per KCWI pipeline instructions
-                #skymask.append(re.sub(".fits","_smsk.fits",sky_group[0]))
+    rows = []
+    for obj, frames in obj_dict.items():
+        if obj.endswith('_sky'):
+            continue                       # sky groups only serve their object group
+        sky_group = obj_dict.get(obj + '_sky')
+        for fn in frames:
+            if sky_group:
+                # external sky frame: no sky mask, per KCWI pipeline instructions
+                rows.append((fn, sky_group[0], ''))
             else:
-                skyframe.append(fn)
-                skymask.append(re.sub(".fits","_smsk.fits",obj_dict[obj][0]))
-    
-    t = Table( (nos, skyframe,skymask), \
-        names=('frame', 'skyframe', 'skymask'))
-    import pandas as pd
+                rows.append((fn, fn, re.sub(r'\.fits$', '_smsk.fits', frames[0])))
+
+    t = Table(rows=rows, names=('frame', 'skyframe', 'skymask'))
     if display:
         print(t)
-    import pickle; pickle.dump(t, open('tmp.pickle', 'wb'))
 
-    df = t.to_pandas()
-    df.replace('', pd.NA, inplace=True)
-    df.to_csv(outfile, index=False, na_rep='',sep=' ')
-    #t.write(outfile, overwrite=True, format='ascii.basic',fill_values=[('', '')])
+    # MakeMasterSky reads this line by line with whitespace splitting and skips
+    # '#' lines; a frame with an external sky frame simply has no third column
+    with open(outfile, 'w') as f:
+        f.write('# frame skyframe skymask\n')
+        for frame, skyframe, skymask in rows:
+            f.write('%s %s %s\n' % (frame, skyframe, skymask) if skymask else '%s %s\n' % (frame, skyframe))
+    print('%s: %d frame(s) written' % (outfile, len(rows)))
 
 
 def main():
-    arg_parser = parser_init()
-    args = arg_parser.parse_args()
-    create_log(**vars(args))
+    args = parser_init().parse_args()
+    create_skyfile(**vars(args))
+
 
 #Call if run from command-line
 if __name__ == "__main__":
